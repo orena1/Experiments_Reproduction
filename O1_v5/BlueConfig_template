@@ -1,0 +1,169 @@
+Run Default
+{
+  Date    14:2:13
+  Time    11:32:35
+          svnPath https://bbpteam.epfl.ch/svn/bluebrain
+  Version    1094 
+
+   MorphologyPath /gpfs/bbp.cscs.ch/release/l2/2012.07.23/morphologies
+       METypePath   /gpfs/bbp.cscs.ch/project/proj1/entities/CCells/24.09.2014
+
+
+      
+      CircuitPath /gpfs/bbp.cscs.ch/project/proj1/circuits/SomatosensoryCxS1-v5.r0/O1/merged_circuit
+      nrnPath /gpfs/bbp.cscs.ch/project/proj1/circuits/SomatosensoryCxS1-v5.r0/O1/merged_circuit/ncsFunctionalAllRecipePathways
+ 
+
+    BaseSeed 83238
+
+  CurrentDir   /gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/VInput_All
+      OutputRoot /gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/VInput_All/100
+      TargetFile /gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/VInput_All/user.target
+
+
+        #RunMode WholeCell
+  CircuitTarget mc2_Column
+         Duration 4500
+               Dt 0.025
+   ForwardSkip 5000
+
+}
+
+
+
+Projection Thalamocortical_input_VPM
+{
+
+ Path /gpfs/bbp.cscs.ch/project/proj1/circuits/SomatosensoryCxS1-v5.r0/O1/merged_circuit/ncsThalamocortical_VPM_tcS2F_2p6_ps
+ Source proj_Thalamocortical_VPM_Source
+ NumSynapseFiles 8192
+}
+
+Stimulus spikeReplay
+{
+        Mode Current
+        Delay 0
+        Duration 100000000
+        Pattern SynapseReplay
+        SpikeFile /gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/inputs.dat 
+
+}
+
+
+StimulusInject spikeReplayIntoUniverse
+{
+        Stimulus spikeReplay
+        Target Mosaic
+}
+
+Reports
+
+ThreshInput
+
+StimulusInject ThresholdIntoExc
+{
+        Stimulus ThresholdExc
+        Target Excitatory
+}
+
+StimulusInject ThresholdIntoInh
+{
+        Stimulus ThresholdInh
+        Target Inhibitory_no_dNAC_dSTUT
+}
+
+StimulusInject ThresholdIntodNAC_dSTUT
+{
+        Stimulus Threshold_dNAC_dSTUT
+        Target dNAC_dSTUT
+}
+
+Stimulus hypamp
+{
+        Mode Current
+  Pattern Hyperpolarizing
+        Delay 0.0
+  Duration 1000000.0
+}
+
+StimulusInject hypamp_mosaic
+{
+        Stimulus hypamp
+        Target Mosaic
+}
+
+OptStim
+
+#Report I_Ca
+{
+        Target AllCompartments_mc2
+          Type Summation
+      ReportOn ica
+          Unit nA
+        Format Bin
+            Dt 0.1
+     StartTime 0
+       EndTime 2000
+}
+
+#Report I_NonSpecific
+{
+        Target AllCompartments_mc2
+          Type Summation
+      ReportOn i_pas ihcn_Ih ihcn_hcn3 icsa_csa
+          Unit nA
+        Format Bin
+            Dt 0.1
+     StartTime 0
+       EndTime 2000
+}
+
+#Report I_NMDA
+{
+       Target AllCompartments_mc2
+         Type Summation
+     ReportOn ProbAMPANMDA_EMS.i_NMDA
+         Unit nA
+       Format Bin
+           Dt 0.1
+    StartTime 0
+      EndTime 2000
+}
+
+#Report I_AMPA
+{
+       Target AllCompartments_mc2
+         Type Summation
+     ReportOn ProbAMPANMDA_EMS.i_AMPA
+         Unit nA
+       Format Bin
+           Dt 0.1
+    StartTime 0
+      EndTime 2000
+}
+
+#Report I_GABA
+{
+       Target AllCompartments_mc2
+         Type Summation
+     ReportOn ProbGABAA_EMS.i
+         Unit nA
+       Format Bin
+           Dt 0.1
+    StartTime 0
+      EndTime 2000
+}
+
+# Spont minis
+# NB: Weights here are effectively ignored.  Weight is taken as that assigned to the synapse
+# after processing all subsequent (non-delayed) connection blocks.
+
+SponMinis
+
+CaKa
+
+FacDep
+
+
+
+
