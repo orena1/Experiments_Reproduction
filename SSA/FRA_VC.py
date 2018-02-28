@@ -9,6 +9,9 @@ from HelpFuncs import SetCaKThresh, SetCaK, SetFacDep
 from Cheetah.Template import Template
 import subprocess
 import numpy as np
+from bluepy.targets.mvddb import Neuron, MType, EType
+import bluepy
+
 tm_text = ''
 tm_text1 = ''
 execfile('../../OSI_files/CreateSimFiles_GitHub/CreateAxonalSpikeFilePossionGenerator_clean_auditory.py')
@@ -21,7 +24,7 @@ k = float(5.0)
 Mg = float(1.0)
 
 
-bbpviz1 = False
+bbpviz1 = True
 
 if bbpviz1 == False:
 ## for bbpbg1
@@ -40,13 +43,13 @@ else:
     special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/x86_64/special -mpi'
     nodes = 2
     ntask_per_node = 16
-    partition = 'prod'
+    partition = 'test'
     bbpviz_txt = 'module load mvapich2/2.2b-slurm-nocuda-1 gcc/4.9.0 hdf5/1.8.16-1\n'\
                      'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/reportinglib/install/lib64\n\n'
     ssh_path = 'bbpviz1.cscs.ch'
 
     
-nice_level = 700    
+nice_level = 1000    
 circuit_target = "mc2_Column"
 remove_spon_minis = False
 reports = {}
@@ -76,7 +79,7 @@ def set_main_path(BasePath, ca, k, DisableUseDep, Disable_CortoCortical, remove_
     return(txt)
 
 
-def create_path_and_copy_file(path_for_simulations):
+def create_path_and_copy_file(path_for_simulations, add_target={}):
     model_folders = '../O1_v5/'
     FilesToCopy = ['launchScript_bg_template.sh', 'inputs.dat', 'user.target', 'BlueConfig_template']
     if not os.path.exists(path_for_simulations):
@@ -87,6 +90,18 @@ def create_path_and_copy_file(path_for_simulations):
             shutil.copyfile(model_folders + FtC, path_for_simulations + '/' + FtC )
 
     shutil.copyfile(os.path.basename(__file__), path_for_simulations + '/' + os.path.basename(__file__) )
+    if add_target != {}:
+        for target in add_target:
+            lines = list(open(path_for_simulations +  '/user.target','r'))
+            if 'Target Cell ' + str(target) +'\n' not in lines:
+                print('Adding Neuron Target')
+                f = open(path_for_simulations +  '/user.target','a')
+                f.write('Target Cell ' + str(target) +'\n{\n')
+                for gid in add_target[target]:
+                    f.write('a' +str(gid) + ' ')
+                f.write('\n}\n\n')
+                f.close()
+
 
 
 
@@ -150,7 +165,7 @@ experiment['tunning_width_gaussian_std']       = float(0.4)
 
 
 ##@@## this is for exponential tunning width 
-Amp = 30
+Amp = 40
 if Amp ==30:
     experiment['tunning_width_distribution']       = 'exp'
     experiment['tunning_width_exp_scale']          = float(0.48)
@@ -226,8 +241,8 @@ Ca_vals = [1.19,1.23,1.3]
 k_vals = [float(3.4),float(3.9),float(4.2),float(4.5),float(4.9)]
 
 
-# Ca_vals = [1.23]
-# k_vals = [float(5.0)]
+Ca_vals = [1.23]
+k_vals = [float(5.0)]
 
 
 # k_vals = [float(3), float(3.5),float(4.0),float(4.9)]
@@ -239,6 +254,31 @@ k_vals = [float(3.4),float(3.9),float(4.2),float(4.5),float(4.9)]
 # pref_boundary_vals = [[4000, 16000]]
 # tunning_width_gaussian_means = [1.0]
 # Ca_vals = [1.0,1.15,1.3,2.0]
+
+
+## For Voltage clamp
+generalConfigPath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/AudInput12_4_16/SSA/Ca1p23/EE0_EI0_IE0_II0_TM_0/Freq_Tono_4to16_FR_S100_W_S0p2_TwoStimsExp/BlueConfig6666_106686'
+Circ = bluepy.Circuit(generalConfigPath)
+layer = 4
+
+Lgids = np.sort(Circ.mvddb.select_gids(Neuron.layer==layer,Neuron.hyperColumn==2, MType.synapse_class=='EXC'))
+seed = 15
+rand = np.random.RandomState(seed)
+net_size = 50
+gids = np.sort(rand.choice(Lgids,size=net_size,replace=False))
+gids_target = {'L' + str(layer) + '_N' + str(net_size) + '_S' + str(seed):gids}
+
+
+vclamp_at = {-80:['L' + str(layer) + '_N' + str(net_size) + '_S' + str(seed)]}
+circuit_target = 'L' + str(layer) + '_N' + str(net_size) + '_S' + str(seed)
+reports = {'soma_voltage':{
+        'REPORT_TARGET':'mc2_Column',
+        'START_TIME':str(0),
+        'END_TIME':str(9e9)}}
+RunMode = 'RunMode WholeCell'
+nice_level = 0
+#Ca_vals = [1.13,1.2,1.25,1.29,1.3,1.35,1.5]
+Ca_vals = [1.7,2.0,2.5]
 for ca in Ca_vals:
     for tunning_width_gaussian_mean in tunning_width_gaussian_means:
         experiment['tunning_width_gaussian_mean'] = tunning_width_gaussian_mean
@@ -248,9 +288,12 @@ for ca in Ca_vals:
                 for axon_stim_fr in axon_stim_fr_vals:
                     experiment['axon_stim_firing_rate_gaussian_mean'] = axon_stim_fr
 
-                    SSA = 1
-
-
+                    SSA = 0
+                    experiment['simulation_end_time']     = (experiment['duration_between_stims'] + experiment['duration_of_stim'])*420 + experiment['first_stimulus_time']  
+                    simulation_duration = experiment['simulation_end_time']
+                    experiment['responsive_axons_probability'] = float(1.0)
+                    print(experiment['simulation_end_time'] )
+                    simulation_time = "6:00:00" # real run time
                     seed = 1
 
                     def set_directory(experiment):
@@ -274,8 +317,8 @@ for ca in Ca_vals:
 
                     SSATypes = ['TwoStimsPeriodic']
                     #DisableUseDeps = [[], [('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
-                    DisableUseDeps =[[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
-                    #DisableUseDeps = [[]]#, [('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
+                    #DisableUseDeps =[[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
+                    DisableUseDeps = [[]]#, [('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
                     Disable_CortoCorticals = [False]
                     remove_SK_E2s = [False]
                     #for SSA simulations
@@ -296,7 +339,7 @@ for ca in Ca_vals:
                                         if tm_text!='stop_asking': tm_text = raw_input('Is this path ok? ("stop_asking" will stop asking)')
                                         if os.path.exists(path_for_simulations) and Standard == [6666,9600]:tm_text1 = raw_input('This path already exist (pass)'); 
                                         if tm_text1=='pass': continue
-                                        create_path_and_copy_file(path_for_simulations)
+                                        create_path_and_copy_file(path_for_simulations, add_target=gids_target)
                                         spike_replay = path_for_simulations + '/SpikeFiles/input' + str(Standard) + '_' + `BS` + '.dat'
                                         print(spike_replay)
                                         run_name = str(Standard) + '_' + `BS` 
@@ -317,7 +360,7 @@ for ca in Ca_vals:
                                         blue_out = crate_blueconfig(BlueConfig_file=f, CurrentDir = path_for_simulations, BS = BS, simulation_duration = simulation_duration,
                                                                                                 run_name=run_name, ca=ca, k=k, Mg=Mg,circuit_target = circuit_target, decouple=Disable_CortoCortical, optogenetic_vars=[],
                                                                                                 DisableUseDep = DisableUseDep,reports=reports,
-                                                                                                RunMode = RunMode, remove_spon_minis=remove_spon_minis, spike_replay=spike_replay)
+                                                                                                RunMode = RunMode, remove_spon_minis=remove_spon_minis, spike_replay=spike_replay, v_clamp=vclamp_at)
                                         f = open(path_for_simulations + 'BlueConfig_' + run_name, 'w')
                                         f.write(blue_out)
                                         f.close()

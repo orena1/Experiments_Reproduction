@@ -11,7 +11,11 @@ import subprocess
 
 def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_name, ca, k, Mg,
                     circuit_target='mc2_Column', decouple=False, optogenetic_vars = [], RunMode = 'RunMode LoadBalance', DisableUseDep = [], reports={}, remove_spon_minis=False,
-                    spike_replay=None, other_circuit=False):
+                    spike_replay=None, other_circuit=False, v_clamp = {}):
+
+    '''
+    v_clamp example - v_clamp[voltage][target] -- v_clamp[-80][L2_PC,L5_PC]
+    '''
 
     newF = ''
     RunBlock = 1 #I assume the RunBlock is in the start
@@ -43,6 +47,12 @@ def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_n
                     newF += Voltage_Report.replace('REPORT_TARGET',reports['soma_voltage']['REPORT_TARGET']).replace('START_TIME',reports['soma_voltage']['START_TIME']).replace('END_TIME',reports['soma_voltage']['END_TIME'])
                 if report_type=='LFP':
                     newF += LFP_Report.replace('START_TIME',reports['LFP']['START_TIME']).replace('END_TIME',reports['LFP']['END_TIME']).replace('DT',reports['LFP']['DT'])
+            if v_clamp != {}:
+                print(v_clamp)
+                for v in v_clamp:
+                    for v_clamp_target in v_clamp[v]:
+                        newF += SEClamptxt.replace('GID',v_clamp_target).replace('VOLTAGE',str(v))
+                        newF += ReportSEClampTxt.replace('GID',v_clamp_target).replace('ASCII','Bin').replace('SEClamp_i','SEClamp_i_' + v_clamp_target)
         elif 'SponMinis' in line:
             if remove_spon_minis == False:
                 newF += str(sponMinisTemplate)
@@ -55,7 +65,7 @@ def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_n
             newF += SetCaK(ca, k, Mg)
         elif 'FacDep' in line:
             newF += SetFacDep(DisableUseDep)
-        elif 'nrnPath' in line and decouple == True or other_circuit is not False:
+        elif 'nrnPath' in line and (decouple == True or other_circuit is not False):
             if decouple ==True and other_circuit is False:
                 newF +='       nrnPath /gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/VisuInput/emptyNRN \n'
             elif decouple ==False and other_circuit is  not False:
@@ -71,16 +81,18 @@ def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_n
     
     
     
-    
+    [003-005,007,011]
 def create_launch_script(launchScript_file, hoc_lib, init_name, special_path, simulation_time, run_name, nice_level=0,
-                         nodes=512, ntask_per_node=32, bbpviz_txt = '', partition='prod'):
+                         nodes=512, ntask_per_node=32, bbpviz_txt = '', partition='prod',account='proj2', job_name=''):
 
+    if job_name =='':
+        job_name = run_name
     newF = ''
     for line in launchScript_file:
         if "--output=" in line:
             newF += '#SBATCH --output=neurodamus-stdout_bg_' + run_name + '.log\n'
         elif "--job-name" in line:
-            newF +='#SBATCH --job-name='+ run_name +'\n'
+            newF +='#SBATCH --job-name='+ job_name +'\n'
         elif "--nodes" in line:
             if  bbpviz_txt=='':
                 newF +='#SBATCH --nodes=' +str(nodes) +'\n'
@@ -89,7 +101,7 @@ def create_launch_script(launchScript_file, hoc_lib, init_name, special_path, si
                 newF +='#SBATCH --ntasks-per-node=' +str(ntask_per_node) +'\n'
             elif bbpviz_txt!='':
                 #newF +='#SBATCH --ntasks-per-node=' +str(ntask_per_node) +'\n'
-                #newF +='#SBATCH -n=' +str(nodes) +'\n'
+                #newF +='#SBATCH --nodes=' +str(nodes) +'\n'
                 #newF +='#SBATCH --exclusive \n'
                 newF +='#SBATCH -n ' + str(ntask_per_node*nodes) +'\n'
                 #newF +='#SBATCH --cpus-per-task=1\n'
@@ -101,12 +113,16 @@ def create_launch_script(launchScript_file, hoc_lib, init_name, special_path, si
             newF +='#SBATCH --nice=' + `nice_level`+'\n'
         elif "--error" in line:
             newF += '#SBATCH --error=neurodamus-stderr_bg_' + run_name + '.log\n'
+        elif "--account" in line:
+            newF += '#SBATCH --account=' + account + '\n'
         elif "--overcommit" in line:
             if bbpviz_txt=='':
                 newF += line
         elif 'export HOC_LIB' in line:
             newF += 'export HOC_LIBRARY_PATH=' + hoc_lib + '\n' + bbpviz_txt
         elif 'srun' in line:
+            if bbpviz_txt!='':#X fix
+                newF +=  'srun -n $SLURM_JOB_NUM_NODES --ntasks-per-node=1  sudo /usr/local/bin/restartX.sh \n'
             newF += line.replace('BlueConfig','BlueConfig_' + run_name).replace('init.hoc',init_name).replace('binPath',special_path) + '\n'
         else:
                 newF += line
@@ -268,3 +284,35 @@ Connection ConInh-Uni
 
 
 sponMinisTemplate = Template(SponMinisTemplate)
+
+SEClamptxt = 'Stimulus voltage_clamp\n ' \
+'{\n' \
+'        Mode Current\n' \
+'        Pattern SEClamp\n' \
+'        Delay 0\n' \
+'        Duration 100000000\n' \
+'        Voltage VOLTAGE\n' \
+'}\n'\
+'\n'\
+'\n'\
+'StimulusInject voltage_clamps\n'\
+'{\n'\
+'        Stimulus voltage_clamp\n'\
+'        Target GID\n'\
+'}\n\n'
+
+
+
+ReportSEClampTxt = 'Report SEClamp_i\n'\
+'{\n'\
+'        Target GID\n'\
+'          Type Summation\n'\
+'      ReportOn SEClamp.i\n'\
+'          Unit nA\n'\
+'        Format ASCII\n'\
+'            Dt 0.1\n'\
+'     StartTime 0\n'\
+'       EndTime 250000\n'\
+'}\n\n'
+
+

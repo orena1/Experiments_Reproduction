@@ -180,9 +180,9 @@ def RunSingleGid(Gid, original_path, blue_config_name, spike_replay_path, new_pa
         elif '--output' in l or '--error' in l:
             txt+=l.replace('.log',blue_config_name.replace('BlueConfig','') + '_'+str(Gid) + '.log')
         elif 'HOC_LIBRARY_PATH=' in l:
-            txt+='module load BBP/hpc/latest\n'
+            txt+='module load BBP/hpc/2017.06\n' # BBP/hpc/latest
         elif 'srun' in l and 'powerpc64' in l:
-            if 'Master06_11_16' not in l:
+            if 'Master06_11_16' not in l and 'Master07_07_17' not in l:
                 raise Exception('You need to fix the neurodamus paths,  also up!!!!!')
             txt+='srun special  -c '\
                 '"{strdef configFile configFile=\\"' +blue_config_name + '_' +  str(Gid) +  '\\"}" -NFRAME 256 $BBP_HOME/hoclib/init.hoc -mpi \n'

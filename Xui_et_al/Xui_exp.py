@@ -23,14 +23,43 @@ RunModeToNeurodamusPath = {'RunMode LoadBalance':['/gpfs/bbp.cscs.ch/project/pro
                         }
 
 
+bbpviz1 = False
+
+if bbpviz1 == False:
+## for bbpbg1
+    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib/hoclib'
+    init_name = 'init.hoc'
+    special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib/powerpc64/special'
+    nodes = 512
+    ntask_per_node = 32
+    partition = 'exception'
+    bbpviz_txt= ''
+    ssh_path = 'bbpbg2.cscs.ch'
+    account  = 'proj64'
+else:
+## for bbpviz1
+    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/hoclib'
+    init_name = 'init.hoc'
+    special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/x86_64/special -mpi'
+    nodes = 2
+    ntask_per_node = 15
+    partition = 'prod'
+    bbpviz_txt = 'module load mvapich2/2.2b-slurm-nocuda-1 gcc/4.9.0 hdf5/1.8.16-1\n'\
+                     'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/reportinglib/install/lib64\n\n'
+    ssh_path = 'bbpviz1.cscs.ch'
+
+
+
+
+
 remove_spon_minis = False
 run = '1'
-
+other_circuit = '/gpfs/bbp.cscs.ch/project/proj2/circuits/SomatosensoryCxS1-v5.r0_postprocessing'
 path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Xue_Nature_2014/31_01_2017/Ca' + \
                             str(ca).replace('.','p') + '_K' + str(k).replace('.','p') +'/Run_' +str(run)  +  '/Remove_Minis_' +str(remove_spon_minis) +'/var_' + str(var).replace('.','p').replace('-','_')+'/'
-hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/hoclib'
-init_name = 'init.hoc'
-special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/powerpc64/special'
+if other_circuit is not False:
+    path_for_simulations =path_for_simulations[:-1] + 'other_circuit/'
+
 
 reports = {'soma_voltage':{
         'REPORT_TARGET':'mc2_Column',
@@ -38,7 +67,7 @@ reports = {'soma_voltage':{
         'END_TIME':str(9e9)}}
 
 simulation_time = "03:00:00"
-nice_level = 2000
+nice_level = 0
 
 
 opto_gen_stimstart = 2000
@@ -50,6 +79,13 @@ seeds = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
 #amplitudes = [40,80,100,120,140,160,170,175,180,200] #Ca2p5
 amplitudes = [450,700] #Ca2p5
 
+
+
+# seeds = [2]
+
+# #amplitudes = [60,100,140,160,180,200,210,220,245,265] #Ca1p5 or Ca1p25
+# #amplitudes = [40,80,100,120,140,160,170,175,180,200] #Ca2p5
+# amplitudes = [450] #Ca2p5
 
 amplitudes = map(float,amplitudes)
 stim_durations = [5] #Don't use 0.5 ms
@@ -77,7 +113,7 @@ for seed in seeds:
             f = open(path_for_simulations +'/BlueConfig_template','r')
             blue_out = crate_blueconfig(BlueConfig_file=f, CurrentDir = path_for_simulations, BS = BS, simulation_duration = simulation_duration,
                                                                     run_name=run_name, ca=ca, k=k, Mg=Mg, optogenetic_vars=['current_injections', morphs, stim_vars],reports=reports,
-                                                                    remove_spon_minis=remove_spon_minis)
+                                                                    remove_spon_minis=remove_spon_minis, other_circuit=other_circuit)
             f = open(path_for_simulations + 'BlueConfig_' + run_name, 'w')
             f.write(blue_out)
             f.close()
@@ -85,20 +121,17 @@ for seed in seeds:
             
             f = open(path_for_simulations +'/launchScript_bg_template.sh','r')
             launch_out = create_launch_script(launchScript_file=f, hoc_lib=hoc_lib, init_name=init_name, special_path=special_path, simulation_time=simulation_time,
-                                                                                run_name=run_name, nice_level=nice_level)
+                                                                                run_name=run_name, nice_level=nice_level, nodes=nodes, ntask_per_node=ntask_per_node, 
+                                                                                    bbpviz_txt = bbpviz_txt, partition=partition, account=account)
             f = open(path_for_simulations + 'launchScript_bg_' + run_name +'.sh', 'w')
             f.write(launch_out)
             f.close()
             if not os.path.exists(path_for_simulations + '/' + run_name): #If folder already exist do not send it.
                 run_names.append('sbatch launchScript_bg_' + run_name +'.sh')
 
-submit_jobs(run_names, path_for_simulations, MaxJobs = 8,  all_after_one=False)
+submit_jobs(run_names, path_for_simulations, MaxJobs = 2,  all_after_one=True)
                     
                 
-
-
-
-
 
 
 
