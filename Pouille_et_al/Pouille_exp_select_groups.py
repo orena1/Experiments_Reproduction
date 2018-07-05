@@ -20,35 +20,49 @@ Mg = 1.0
 var = 0.000001 # 0.000001 |0.3
 
 
-bbpviz1 = False
+core_neuron = False
+cluster = 'bbpv1' # bbpv1 # bbpviz1 # bbpv1core_neuron
 
-if bbpviz1 == False:
-## for bbpbg1
-    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/hoclib'
+if cluster == 'bbpviz1':
+    ## for bbpbg1
+    raise Exception('not_working_yet')
+elif cluster == 'bbpv1':
+    ## for bbpv1
+    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/hoclib'
     init_name = 'init.hoc'
-    special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/powerpc64/special'
-    nodes = 512
-    ntask_per_node = 32
+    special_path = '--mpi=pmi2 /gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/x86_64/special -mpi'
+    nodes = 16
+    ntask_per_node = 36
     partition = 'prod'
-    bbpviz_txt= ''
-    ssh_path = 'bbpbg2.cscs.ch'
-else:
-## for bbpviz1
-    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/hoclib'
+    bbpviz_txt = 'module load nix/hdf5/1.10.1 intel-parallel-studio/cluster.2018.1\n'\
+                     'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/bbpviz1NeuRep/reportinglib/install/lib64\n\n'
+    ssh_path = 'bbpv1.epfl.ch'
+elif cluster == 'bbpv1core_neuron':
+    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/sources/neurodamus/lib_gamma/hoclib'
     init_name = 'init.hoc'
-    special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/x86_64/special -mpi'
-    nodes = 2
-    ntask_per_node = 16
-    partition = 'test'
-    bbpviz_txt = 'module load mvapich2/2.2b-slurm-nocuda-1 gcc/4.9.0 hdf5/1.8.16-1\n'\
-                     'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/reportinglib/install/lib64\n\n'
-    ssh_path = 'bbpviz1.cscs.ch'
+    special_path = '''--mpi=pmi2 $NEURON_EXE -mpi -c 'strdef simulator' -c simulator='"CORENEURON"' '''
+    nodes = 16
+    ntask_per_node = 36
+    partition = 'prod'
+    bbpviz_txt = 'module intel-parallel-studio/cluster.2018.1\n\n'\
+                  'export NEURON_EXE=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/sources/neurodamus/lib_gamma/x86_64/special\n'\
+                  'export CORENEURON_EXE=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/install/bin/coreneuron_exec\n' \
+                  'export HOC_LIBRARY_PATH=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/sources/neurodamus/lib/hoclib\n' \
+                  'export LD_LIBRARY_PATH=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/install/lib64:$LD_LIBRARY_PATH\n'
+
+    ssh_path = 'bbpv1.epfl.ch'
+    core_neuron = True
 
 
 
 
+NMDA_GAMMA = True
+if NMDA_GAMMA==True:
+    special_path = special_path.replace('lib','lib_gamma')
 
-simulation_time = "02:25:00"
+
+
+simulation_time = "09:25:00"
 nice_level = 1200
 opto_gen_stimstart = 2000
 simulation_duration = 2250
@@ -67,13 +81,12 @@ amplitudes = [410,450,500,550,600,700,800,900,1500,2500,3500,4500]  # Ca1p5 # Ca
 
 run = 'Groups_stims_1'
 
-
 amplitudes = map(float,amplitudes)
 
 
 
 
-path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Pouille_2009/02_03_2017/Ca' + str(ca).replace('.','p') + '_K' + str(k).replace('.','p') +'/Run_' +str(run)  +  '_step/Remove_Minis_' +str(remove_spon_minis) +'/var_' + str(var).replace('.','p').replace('-','_')+'/'
+path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Pouille_2009/09_05_2018/Ca' + str(ca).replace('.','p') + '_K' + str(k).replace('.','p') +'/Run_' +str(run)  +  '_step/Remove_Minis_' +str(remove_spon_minis) +'/var_' + str(var).replace('.','p').replace('-','_')+'/'
 print(path_for_simulations)
 model_folders = '../O1_v5/'
 FilesToCopy = ['launchScript_bg_template.sh', 'inputs.dat', 'user.target', 'BlueConfig_template']
@@ -167,7 +180,7 @@ for seed in seeds:
             if not os.path.exists(path_for_simulations + '/' + run_name): #If folder already exist do not send it.
                 run_names.append('sbatch launchScript_bg_' + run_name +'.sh')
 
-submit_jobs(run_names, path_for_simulations, MaxJobs = 8,  all_after_one=False, ssh_path=ssh_path)
+submit_jobs(run_names, path_for_simulations, MaxJobs = 18,  all_after_one=True, ssh_path=ssh_path)
                     
 print('dfsdfdsf')
 
@@ -179,7 +192,7 @@ amplitudes = [300,340,450,200,250,280,310,340,370,410,450,500,550,700,900,1200,1
 if var!=0.000001:
     raise Exception("No var is not 0.00001 no need to run ramp, as ramp does not have var!")
 
-path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Pouille_2009/02_03_2017/Ca'  \
+path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Pouille_2009/09_05_2018/Ca'  \
                            + str(ca).replace('.','p') + '_K' + str(k).replace('.','p') +'/Run_' +str(run)  +  '_ramp/Remove_Minis_' +str(remove_spon_minis) +'/var_' + str(var).replace('.','p').replace('-','_')+'/'
 model_folders = '../O1_v5/'
 FilesToCopy = ['launchScript_bg_template.sh', 'inputs.dat', 'user.target', 'BlueConfig_template']
@@ -226,7 +239,7 @@ for seed in seeds:
             if not os.path.exists(path_for_simulations + '/' + run_name):
                 run_names.append('sbatch launchScript_bg_' + run_name +'.sh')
 
-submit_jobs(run_names, path_for_simulations, MaxJobs = 7,  all_after_one=False, ssh_path=ssh_path)
+submit_jobs(run_names, path_for_simulations, MaxJobs = 5,  all_after_one=True, ssh_path=ssh_path)
                     
 
   

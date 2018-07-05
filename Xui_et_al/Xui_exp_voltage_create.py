@@ -10,9 +10,12 @@ import subprocess
 
 execfile('../general_scripts/VoltageCreate.py')
 
+bbpviz_modules = 'module load mvapich2/2.2b-slurm-nocuda-1 gcc/4.9.0 hdf5/1.8.16-1\n'\
+                     'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/bbpviz1NeuRep/reportinglib/install/lib64\n\n'
 
-OriginalPath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Xue_Nature_2014/31_01_2017/Ca1p25_K2p5/Run_1/Remove_Minis_False/var_1e_06other_circuit/'
-NewPath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Xue_Nature_2014/31_01_2017/Ca1p25_K2p5/Run_1/Remove_Minis_False/var_1e_06other_circuit_SEClmaps/'
+
+OriginalPath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Xue_Nature_2014/Gamma_31_01_2017/Ca1p25_K2p5/Run_1/Remove_Minis_False/var_1e_06/'
+NewPath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Xue_Nature_2014/Gamma_31_01_2017/Ca1p25_K2p5/Run_1/Remove_Minis_False/var_1e_06_SEClmaps/'
 
 FilesToCopy = ['user.target','inputs.dat']
 
@@ -28,7 +31,9 @@ Gids = {'L3_N' + str(net_size) + '_S' + str(seed):Gids}
 
 
 #seeds = [1,2,3,4,5,6]
-seeds = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
+seeds = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
+
+#seeds = [1]
 
 amplitudes = [450,700] 
 amplitudes = map(float,amplitudes)
@@ -45,7 +50,7 @@ for voltage_clamp_at in [0,-80]:
                 spike_replay_path = OriginalPath +'/' + run_name + '/'
                 blue_config_name = 'BlueConfig_' + run_name
                 RunSingleGid(Gids, original_path=OriginalPath, blue_config_name=blue_config_name,  spike_replay_path=spike_replay_path, voltage_clamp_at=voltage_clamp_at,
-                                        new_path = NewPath_v, FilesToCopy=FilesToCopy,ntasks=16,report_format='Bin')
+                                        new_path = NewPath_v, FilesToCopy=FilesToCopy,ntasks=16,report_format='Bin', bbpviz_modules=bbpviz_modules)
 
 
 

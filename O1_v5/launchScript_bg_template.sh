@@ -64,9 +64,6 @@ export HOC_LIBRARY_PATH=/gpfs/bbp.cscs.ch/project/proj2/Programs/SaveStateNeuron
 
 
 # default runs with max mpi process = ntasks
-#srun /gpfs/bbp.cscs.ch/project/proj2/Programs/NewNeurodamus/bbpbgStSo/install/bin/special -c "{strdef configFile configFile=\"BlueConfig\"}" -NFRAME 256 $HOC_LIBRARY_PATH/init.hoc
-
-# default runs with max mpi process = ntasks
 srun binPath -c "{strdef configFile configFile=\"BlueConfig\"}" -NFRAME 256 $HOC_LIBRARY_PATH/init.hoc
 
 echo "EndTime" `date +"%d-%m-%y-%T"`

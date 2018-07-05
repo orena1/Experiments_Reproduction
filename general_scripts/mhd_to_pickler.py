@@ -24,7 +24,7 @@ def load_itk(filename):
 
     return ct_scan, origin, spacing
 
-
+## The path of the output files from voxelize should be an input to the script
 path = sys.argv[1]
 #path = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Cardin_Nature_2009/31_07_2017/Ca1p23_K5p0/Run_2_LFP/Remove_Minis_False/var_1e_06//freq40p0_amp3000p0_pulse_width2p5_BS1095000/'
 os.chdir(path)

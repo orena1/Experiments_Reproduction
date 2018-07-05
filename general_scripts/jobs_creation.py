@@ -11,10 +11,11 @@ import subprocess
 
 def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_name, ca, k, Mg,
                     circuit_target='mc2_Column', decouple=False, optogenetic_vars = [], RunMode = 'RunMode LoadBalance', DisableUseDep = [], reports={}, remove_spon_minis=False,
-                    spike_replay=None, other_circuit=False, v_clamp = {}):
+                    spike_replay=None, other_circuit=False, v_clamp = {}, RNGMode = 'Compatibility'):
 
     '''
     v_clamp example - v_clamp[voltage][target] -- v_clamp[-80][L2_PC,L5_PC]
+    RNGMode = Compatibility, UpdatedMCell, or Random123
     '''
 
     newF = ''
@@ -28,6 +29,7 @@ def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_n
             newF += '      TargetFile ' + CurrentDir + '/user.target\n'
         elif 'BaseSeed' in line:
             newF += '        BaseSeed ' + `BS` + '\n'
+            newF += '        RNGMode '  + RNGMode + '\n'
             if 'LFP' in reports:
                 newF += '        ElectrodesPath /gpfs/bbp.cscs.ch/project/proj1/circuits/SomatosensoryCxS1-v5.r0/O1/merged_circuit\n'
         elif '#RunMode' in line:
@@ -78,12 +80,9 @@ def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_n
             RunBlock = 0 #End of RunBlock
                 
     return(newF)
-    
-    
-    
-    [003-005,007,011]
+
 def create_launch_script(launchScript_file, hoc_lib, init_name, special_path, simulation_time, run_name, nice_level=0,
-                         nodes=512, ntask_per_node=32, bbpviz_txt = '', partition='prod',account='proj2', job_name=''):
+                         nodes=512, ntask_per_node=32, bbpviz_txt = '', partition='prod',account='proj2', job_name='', core_neuron = False):
 
     if job_name =='':
         job_name = run_name
@@ -100,11 +99,21 @@ def create_launch_script(launchScript_file, hoc_lib, init_name, special_path, si
             if  bbpviz_txt=='':
                 newF +='#SBATCH --ntasks-per-node=' +str(ntask_per_node) +'\n'
             elif bbpviz_txt!='':
-                #newF +='#SBATCH --ntasks-per-node=' +str(ntask_per_node) +'\n'
-                #newF +='#SBATCH --nodes=' +str(nodes) +'\n'
-                #newF +='#SBATCH --exclusive \n'
-                newF +='#SBATCH -n ' + str(ntask_per_node*nodes) +'\n'
+                newF +='#SBATCH --ntasks-per-node=' +str(ntask_per_node) +'\n'
+                newF +='#SBATCH --nodes=' +str(nodes) +'\n'
+                newF +='#SBATCH --exclusive \n'
+                if ntask_per_node==64:
+                    newF +='#SBATCH -C knl\n'
+                else:
+                    newF +='#SBATCH -C nvme|cpu\n'
+                #newF +='#SBATCH -n ' + str(ntask_per_node*nodes) +'\n'
                 #newF +='#SBATCH --cpus-per-task=1\n'
+                if nodes>16:
+                    newF +='#SBATCH --qos=bigjob\n'
+                if int(simulation_time[:2])>24:
+                    newF +='#SBATCH --qos=longjob\n'
+                if int(simulation_time[:2])>24 and nodes>16:
+                    raise Exception('Will not work, no qos for it!')
         elif "#SBATCH --time=" in line:
             newF += "#SBATCH --time=" + simulation_time + '\n'
         elif "#SBATCH --partition=" in line:
@@ -121,15 +130,17 @@ def create_launch_script(launchScript_file, hoc_lib, init_name, special_path, si
         elif 'export HOC_LIB' in line:
             newF += 'export HOC_LIBRARY_PATH=' + hoc_lib + '\n' + bbpviz_txt
         elif 'srun' in line:
-            if bbpviz_txt!='':#X fix
-                newF +=  'srun -n $SLURM_JOB_NUM_NODES --ntasks-per-node=1  sudo /usr/local/bin/restartX.sh \n'
+            #if bbpviz_txt!='':#X fix
+            #    newF +=  'srun -n $SLURM_JOB_NUM_NODES --ntasks-per-node=1  sudo /usr/local/bin/restartX.sh \n'
             newF += line.replace('BlueConfig','BlueConfig_' + run_name).replace('init.hoc',init_name).replace('binPath',special_path) + '\n'
+            if core_neuron==True:
+                newF += 'srun --mpi=pmi2 $CORENEURON_EXE -mpi --read-config ' + run_name +'/sim.conf\n'
         else:
                 newF += line
     return(newF)
 
 
-def submit_jobs(run_names, path_for_simulations, MaxJobs, all_after_one=False, ssh_path ='bbpbg2.cscs.ch'):
+def submit_jobs(run_names, paths_for_simulations, MaxJobs, all_after_one=False, ssh_path ='bbpbg2.cscs.ch', force_all_after_one = False):
     '''
     This function submit the jobs to the bbpbg1
     
@@ -137,14 +148,15 @@ def submit_jobs(run_names, path_for_simulations, MaxJobs, all_after_one=False, s
     ----------
     run_names: list of strings
                Each string in the list will be executed on bbpbg1 e.g. ['sbatch l_1.sh', 'sbatch l_2.sh']
-    path_for_simulations: string
-                          The path to the lauchscripts
-    
+    path_for_simulations: string or list
+                          string: The path to the lauchscripts
+                          list:   The corresponding paths for the simulations
     MaxJobs: int
              Maximum number of concurrent jobs
     all_after_one: True or False
                    When this var is True all the works will be executed after the first job (if MaxJobs<inf the concurrent jobs will start after the first job)
-    
+    force_all_after_one: True or False
+                   give you the ability to force all after one, for the case where you want to submit many simulation in different directories
     
     example: submit_jobs([..], [..], 5, all_after_one=Ture)   - the first job will run and after it will be finished the max concurrent jobs will be 5
              submit_jobs([..], [..], 5, all_after_one=False)  - max concurrent jobs will be 5
@@ -156,13 +168,17 @@ def submit_jobs(run_names, path_for_simulations, MaxJobs, all_after_one=False, s
     
     '''
     BaseDir = os.getcwd()
-    os.chdir(path_for_simulations)
-    if os.path.exists('mcomplex.dat')==False and all_after_one==False:
+    if type(paths_for_simulations) !=list:
+        paths_for_simulations = [paths_for_simulations]*len(run_names)
+    if os.path.exists('mcomplex.dat')==False and all_after_one==False and force_all_after_one==False:
         raise Exception("Not multisplit data and all_after_one is set to False")
+    
     NumOfJobs = 0
     lastDep = 0
     JobsList = []
-    for l in run_names:
+    for l,path_for_simulations in zip(run_names,paths_for_simulations):
+        os.chdir(path_for_simulations)
+
         if NumOfJobs<MaxJobs:
             if all_after_one==True and NumOfJobs>0:
                 SendTxt = l.split(' ')[0] + ' --dependency=afterany:' + JobsList[0] + ' ' +l.split(' ')[1]
@@ -187,10 +203,10 @@ def submit_jobs(run_names, path_for_simulations, MaxJobs, all_after_one=False, s
         print erre
         JobsList.append(result[0].split()[-1])
         NumOfJobs+=1
-    
-    os.chdir(BaseDir)
-    print path_for_simulations
+        print path_for_simulations
     print '-------------'
+    os.chdir(BaseDir)
+
     return(JobsList)
 
 
@@ -211,9 +227,9 @@ Voltage_Report = 'Report soma\n'\
 
 LFP_Report = 'Report AllCompartmentsMembrane\n'\
 '{\n'\
-'        Target AllCompartments\n'\
+'        Target mc2_Column\n'\
 '          Type Summation\n'\
-'      ReportOn i_membrane\n'\
+'      ReportOn i_membrane IClamp\n'\
 '          Unit nA\n'\
 '        Format Bin\n'\
 '            Dt DT\n'\

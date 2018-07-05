@@ -83,7 +83,7 @@ Stimulus hypamp
         Mode Current
   Pattern Hyperpolarizing
         Delay 0.0
-  Duration 1000000.0
+  Duration 10000000.0
 }
 
 StimulusInject hypamp_mosaic

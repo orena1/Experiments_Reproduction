@@ -87,7 +87,7 @@ TTXblock = 'Modification applyTTX\n'\
 
 cell_check = 1
 def RunSingleGid(Gid, original_path, blue_config_name, spike_replay_path, new_path, FilesToCopy,
-                 voltage_clamp_at, ttx = False, extra_string = '', ntasks=1, report_format='ASCII'):
+                 voltage_clamp_at, ttx = False, extra_string = '', ntasks=1, report_format='ASCII', bbpviz_modules=''):
     '''Gid can be a dic when the key is the name of the grop, or just a gid'''
     
     global cell_check
@@ -180,12 +180,18 @@ def RunSingleGid(Gid, original_path, blue_config_name, spike_replay_path, new_pa
         elif '--output' in l or '--error' in l:
             txt+=l.replace('.log',blue_config_name.replace('BlueConfig','') + '_'+str(Gid) + '.log')
         elif 'HOC_LIBRARY_PATH=' in l:
-            txt+='module load BBP/hpc/2017.06\n' # BBP/hpc/latest
-        elif 'srun' in l and 'powerpc64' in l:
-            if 'Master06_11_16' not in l and 'Master07_07_17' not in l:
-                raise Exception('You need to fix the neurodamus paths,  also up!!!!!')
-            txt+='srun special  -c '\
+            print(original_path)
+            if ('Master06_11_16'  in l or 'Master07_07_17'  in l) and 'Gamma_' not in original_path:
+                txt+='module load BBP/hpc/2017.06\n' # BBP/hpc/latest
+            else:
+                txt+=l
+                txt+=bbpviz_modules +'\n' # the HOC path should stay the same
+        elif 'srun' in l and 'powerpc64' in l and '#' not in l:
+            if ('Master06_11_16' in l or 'Master07_07_17' in l) and 'Gamma_' not in original_path:
+                txt+='srun special  -c '\
                 '"{strdef configFile configFile=\\"' +blue_config_name + '_' +  str(Gid) +  '\\"}" -NFRAME 256 $BBP_HOME/hoclib/init.hoc -mpi \n'
+            else:
+                txt+=l.replace('powerpc64','x86_64').replace(l[l.index("File="):l.index(' -NFR')], 'File=\\"' +blue_config_name + '_' +  str(Gid) +  '\\"}" ').replace('\n',' ') + '-mpi \n'
         else:
             txt+=l
     f.close()

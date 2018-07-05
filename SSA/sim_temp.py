@@ -15,42 +15,76 @@ execfile('../../OSI_files/CreateSimFiles_GitHub/CreateAxonalSpikeFilePossionGene
 execfile('../general_scripts/jobs_creation.py')
 execfile('../general_scripts/opto_gen_protocols.py')
 
+
+
+def set_directory(experiment):
+    if round(experiment['prefered_frequency_boundaries'][0]/1000.0,2) != round(experiment['prefered_frequency_boundaries'][0]/1000.0,3) or round(experiment['prefered_frequency_boundaries'][1]/1000.0,2) != round(experiment['prefered_frequency_boundaries'][1]/1000.0,3):
+        raise Exception('We do not save a frequency with 2 numbers after the rounding point')
+    Directory = 'Freq_Tono_' + str(round(experiment['prefered_frequency_boundaries'][0]/1000.0,2)).replace('.','p') + 'to' + str(round(experiment['prefered_frequency_boundaries'][1]/1000.0,2)).replace('.','p')  + \
+                '_FR_m' + str(experiment['axon_stim_firing_rate_gaussian_mean']).replace('.','p') + '_std' + str(experiment['axon_stim_firing_rate_gaussian_std']).replace('.','p') +\
+                '_W_T' + experiment['tunning_width_distribution'][:3]
+    if experiment['tunning_width_distribution'] ==  'gaussian':  Directory+= '_m' + str(experiment['tunning_width_gaussian_mean']).replace('.','p') + '_std' + str(experiment['tunning_width_gaussian_std']).replace('.','p')
+    if experiment['tunning_width_distribution'] ==  'exp'     :  Directory+= '_m' + str(experiment['tunning_width_exp_loc']).replace('.','p') + '_std' + str(experiment['tunning_width_exp_scale']).replace('.','p')
+    Directory += '_TC_' + experiment['tunnig_curve_type'][:3] + '_ST_' + experiment['stim_type'] 
+    if experiment['stim_type']=='alpha_func': 
+        Directory+= '_DT_' + experiment['alpha_func_delay_distribution'][:3]
+        if   experiment['alpha_func_delay_distribution'] == 'frequency_correlated':
+            Directory+= '_del_b' + str(experiment['delays_gaus_base_line']).replace('.','p') + '_norm' + str(experiment['delays_gaus_norm_factor']).replace('.','p') + '_std' + str(experiment['delays_gaus_std']).replace('.','p')
+        elif experiment['alpha_func_delay_distribution'] == 'gaussian':
+            Directory+= '_del_m' + str(experiment['alpha_func_delay_gaussian_mean']).replace('.','p') + '_std' + str(experiment['alpha_func_delay_gaussian_std']).replace('.','p')
+        Directory+= '_tau_m' + str(experiment['alpha_func_tau_gaussian_mean']).replace('.','p') + '_std' + str(experiment['alpha_func_tau_gaussian_std']).replace('.','p')
+
+    Directory+= '_Pres' + str(experiment['ssa_presentations']) + '_resPro' + str(experiment['responsive_axons_probability']).replace('.','p')
+    if SSA==1: Directory+= '_SSA_p' +  str(1-experiment['ssa_standard_probability']).replace('.','p') +  '_' + experiment['SSAType']
+    return(Directory)
+
+
 #for ca in [0.5,1.0,1.25,1.5,2.0,2.5]:
 ca = float(1.23) #CAline
 k = float(5.0)
 Mg = float(1.0)
 
 
-bbpviz1 = False
 
-if bbpviz1 == False:
-## for bbpbg1
-    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib/hoclib'
-    init_name = 'init.hoc'
-    special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib/powerpc64/special'
-    nodes = 512
-    ntask_per_node = 32
-    partition = 'prod'
-    bbpviz_txt= ''
-    ssh_path = 'bbpbg2.cscs.ch'
-else:
-## for bbpviz1
-    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/hoclib'
-    init_name = 'init.hoc'
-    special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/x86_64/special -mpi'
-    nodes = 2
-    ntask_per_node = 16
-    partition = 'prod'
-    bbpviz_txt = 'module load mvapich2/2.2b-slurm-nocuda-1 gcc/4.9.0 hdf5/1.8.16-1\n'\
-                     'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/reportinglib/install/lib64\n\n'
-    ssh_path = 'bbpviz1.cscs.ch'
 
+core_neuron = False
+cluster = 'bbpv1core_neuron' # bbpv1 # bbpviz1 # bbpv1core_neuron
+
+if cluster == 'bbpviz1':
+    ## for bbpbg1
+    raise Exception('not_working_yet')
+elif cluster == 'bbpv1':
+    ## for bbpv1
+    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/hoclib'
+    init_name = 'init.hoc'
+    special_path = '--mpi=pmi2 /gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/x86_64/special -mpi'
+    nodes = 24
+    ntask_per_node = 36
+    partition = 'prod'
+    bbpviz_txt = 'module load nix/hdf5/1.10.1 intel-parallel-studio/cluster.2018.1\n'\
+                     'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/bbpviz1NeuRep/reportinglib/install/lib64\n\n'
+    ssh_path = 'bbpv1.epfl.ch'
+elif cluster == 'bbpv1core_neuron':
+    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/sources/neurodamus/lib_gamma/hoclib'
+    init_name = 'init.hoc'
+    special_path = '''--mpi=pmi2 $NEURON_EXE -mpi -c 'strdef simulator' -c simulator='"CORENEURON"' '''
+    nodes = 16
+    ntask_per_node = 36
+    partition = 'prod'
+    bbpviz_txt = 'module intel-parallel-studio/cluster.2018.1\n\n'\
+                  'export NEURON_EXE=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/sources/neurodamus/lib_gamma/x86_64/special\n'\
+                  'export CORENEURON_EXE=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/install/bin/coreneuron_exec\n' \
+                  'export HOC_LIBRARY_PATH=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/sources/neurodamus/lib/hoclib\n' \
+                  'export LD_LIBRARY_PATH=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/install/lib64:$LD_LIBRARY_PATH\n'
+
+    ssh_path = 'bbpv1.epfl.ch'
+    core_neuron = True
     
-nice_level = 700    
+nice_level = 0    
 circuit_target = "mc2_Column"
 remove_spon_minis = False
 reports = {}
-
+RNGMode = 'Random123'
 
 RunMode = 'RunMode LoadBalance'
 record_lfp = False
@@ -89,10 +123,12 @@ def create_path_and_copy_file(path_for_simulations):
     shutil.copyfile(os.path.basename(__file__), path_for_simulations + '/' + os.path.basename(__file__) )
 
 
+NMDA_GAMMA = False
 
+BasePath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/AudInput12_04_18_high_gamma_core_neuron/SSA/'
 
-BasePath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/AudInput31_12_17_new_architecture/SSA/'
-
+if NMDA_GAMMA==True:
+    special_path = special_path.replace('lib','lib_gamma')
 
 
 experiment = {}
@@ -105,8 +141,8 @@ experiment['duration_of_stim']        = 30
 experiment['duration_between_stims']  = 270  #End to start
 experiment['first_stimulus_time']     = 2000
 
-experiment['ssa_presentations']     = 100
-experiment['ssa_standard_probability'] = 0.9
+experiment['ssa_presentations']     = 500
+experiment['ssa_standard_probability'] = 0.95
 experiment['ssa_presentations_seed'] = 1 
 
 experiment['spontaneous_firing_rate_type'] = 'constant' #When I have sontaneuos firing rate, it will be added to the osi firing rate, which means that the firing rate will be higher than the one which was set in the 
@@ -121,7 +157,7 @@ experiment['prefered_frequency_boundaries'] = [5660, 11310] # 1 octave
 #experiment['prefered_frequency_boundaries'] = [4000, 16000] # 2 octvaes
 
 
-simulation_time = "9:00:00" # real run time
+simulation_time = "52:00:00" # real run time
 simulation_duration = experiment['simulation_end_time']   # bilogical time
 
 #Tunning curve
@@ -136,7 +172,7 @@ experiment['tunning_width_gaussian_std']       = float(0.0)
 
 #Firing rate
 #opt step
-experiment['stim_type'] = 'step'
+experiment['stim_type'] = 'alpha_func'
 experiment['axon_stim_firing_rate_distribution']       = 'gaussian'
 experiment['axon_stim_firing_rate_gaussian_mean']       = float(30)
 experiment['axon_stim_firing_rate_gaussian_std']       = float(0)
@@ -150,7 +186,7 @@ experiment['tunning_width_gaussian_std']       = float(0.4)
 
 
 ##@@## this is for exponential tunning width 
-Amp = 30
+Amp = 40
 if Amp ==30:
     experiment['tunning_width_distribution']       = 'exp'
     experiment['tunning_width_exp_scale']          = float(0.48)
@@ -168,10 +204,15 @@ if Amp==40:
     experiment['axon_stim_firing_rate_gaussian_mean']       = float(470)
     experiment['axon_stim_firing_rate_gaussian_std']       = float(180)
 
-experiment['stim_type'] = 'alpha_func'
+# old values for Amp 30 or 40
 experiment['alpha_func_delay_distribution'] = 'gaussian'
 experiment['alpha_func_delay_gaussian_mean'] = float(16.2 - 10) ## I remove 10 ms so I will not need to fix the concept that each presentation is 30 ms!
 experiment['alpha_func_delay_gaussian_std'] = float(4.2)
+# values for freq_corr mean of all amplitudes 
+experiment['alpha_func_delay_distribution'] = 'frequency_correlated'
+experiment['delays_gaus_base_line'] = float(18) ## I remove 10 ms so I will not need to fix the concept that each presentation is 30 ms!
+experiment['delays_gaus_norm_factor'] = float(7)
+experiment['delays_gaus_std'] = float(0.8)
 
 experiment['alpha_func_tau_distribution'] = 'gaussian'
 experiment['alpha_func_tau_gaussian_mean'] = float(2.7)
@@ -218,12 +259,20 @@ experiment['responsive_axons_probability'] = float(0.58)
 
 axon_stim_fr_vals = [experiment['axon_stim_firing_rate_gaussian_mean']]
 pref_boundary_vals = [[4000, 16000]]
+center_frequencies = [(6666, 9600)]
+experiment['center_frequencies'] = center_frequencies
+
+
 tunning_width_gaussian_means = [experiment['tunning_width_gaussian_mean']]
 Ca_vals = [1.23,2.0]
 k_vals = [float(3), float(3.5),float(4.0),float(4.9)]
 
 Ca_vals = [1.19,1.23,1.3]
 k_vals = [float(3.4),float(3.9),float(4.2),float(4.5),float(4.9)]
+
+
+Ca_vals = [1.2, 1.23]
+k_vals = [float(4.0),float(4.5),float(4.9)]
 
 
 # Ca_vals = [1.23]
@@ -239,110 +288,114 @@ k_vals = [float(3.4),float(3.9),float(4.2),float(4.5),float(4.9)]
 # pref_boundary_vals = [[4000, 16000]]
 # tunning_width_gaussian_means = [1.0]
 # Ca_vals = [1.0,1.15,1.3,2.0]
-for ca in Ca_vals:
-    for tunning_width_gaussian_mean in tunning_width_gaussian_means:
-        experiment['tunning_width_gaussian_mean'] = tunning_width_gaussian_mean
-        for pref_boundary in pref_boundary_vals:
-            experiment['prefered_frequency_boundaries'] = pref_boundary
-            for k in k_vals:
-                for axon_stim_fr in axon_stim_fr_vals:
-                    experiment['axon_stim_firing_rate_gaussian_mean'] = axon_stim_fr
-
-                    SSA = 1
 
 
-                    seed = 1
+del_std_couples = [[float(4),float(0.8)], [float(6),float(0.8)], [float(8),float(0.8)], [float(10),float(0.)], [float(7),float(0.4)], [float(7),float(0.6)], [float(7),float(1)]]
 
-                    def set_directory(experiment):
-                        if round(experiment['prefered_frequency_boundaries'][0]/1000.0,2) != round(experiment['prefered_frequency_boundaries'][0]/1000.0,3) or round(experiment['prefered_frequency_boundaries'][1]/1000.0,2) != round(experiment['prefered_frequency_boundaries'][1]/1000.0,3):
-                            raise Exception('We do not save a frequency with 2 numbers after the rounding point')
-                        Directory = 'Freq_Tono_' + str(round(experiment['prefered_frequency_boundaries'][0]/1000.0,2)).replace('.','p') + 'to' + str(round(experiment['prefered_frequency_boundaries'][1]/1000.0,2)).replace('.','p')  + \
-                                    '_FR_m' + str(experiment['axon_stim_firing_rate_gaussian_mean']).replace('.','p') + '_std' + str(experiment['axon_stim_firing_rate_gaussian_std']).replace('.','p') +\
-                                    '_W_T' + experiment['tunning_width_distribution'][:3]
-                        if experiment['tunning_width_distribution'] ==  'gaussian':  Directory+= '_m' + str(experiment['tunning_width_gaussian_mean']).replace('.','p') + '_std' + str(experiment['tunning_width_gaussian_std']).replace('.','p')
-                        if experiment['tunning_width_distribution'] ==  'exp'     :  Directory+= '_m' + str(experiment['tunning_width_exp_loc']).replace('.','p') + '_std' + str(experiment['tunning_width_exp_scale']).replace('.','p')
-                        Directory += '_TC_' + experiment['tunnig_curve_type'][:3] + '_ST_' + experiment['stim_type'] 
-                        if experiment['stim_type']=='alpha_func': Directory+='_del_m' + str(experiment['alpha_func_delay_gaussian_mean']).replace('.','p') + '_std' + str(experiment['alpha_func_delay_gaussian_std']).replace('.','p') +\
-                                                                             '_tau_m' + str(experiment['alpha_func_tau_gaussian_mean']).replace('.','p') + '_std' + str(experiment['alpha_func_tau_gaussian_std']).replace('.','p')
+del_std_couples = [[float(15),float(0.4)], [float(15),float(0.5)], [float(10),float(0.2)],[float(10),float(0.3)], [float(14),float(0.3)]]
+
+del_std_couples = [[float(15),float(0.4)],[float(6),float(0.8)]]
+
+Ca_vals = [1.25]
+k_vals = [float(4.0)]
+
+del_std_couples = [[float(15),float(0.4)]]
+
+for experiment['delays_gaus_norm_factor'],experiment['delays_gaus_std'] in del_std_couples:
+    #Set all delays to the same value
+    # experiment['alpha_func_delay_distribution'] = 'gaussian'
+    # experiment['alpha_func_delay_gaussian_mean'] = float(5) ## I remove 10 ms so I will not need to fix the concept that each presentation is 30 ms!
+    # experiment['alpha_func_delay_gaussian_std'] = float(0)
+    
+    for ca in Ca_vals:
+        for tunning_width_gaussian_mean in tunning_width_gaussian_means:
+            experiment['tunning_width_gaussian_mean'] = tunning_width_gaussian_mean
+            for pref_boundary in pref_boundary_vals:
+                experiment['prefered_frequency_boundaries'] = pref_boundary
+                for k in k_vals:
+                    for axon_stim_fr in axon_stim_fr_vals:
+                        experiment['axon_stim_firing_rate_gaussian_mean'] = axon_stim_fr
+                        SSA = 1
+                        seed = 1
+                        SSATypes = ['DiverseBroadExpR']
+                        #SSATypes = ['Equal']; experiment['ssa_standard_probability'] = 0.5
+                        #DisableUseDeps = [[], [('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
+                        #DisableUseDeps =[[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
+                        DisableUseDeps = [[]]#,[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
+                        
+                        Disable_CortoCorticals = [False]
+                        remove_SK_E2s = [False]
+                        #for SSA simulations
+                        run_names = []
+                        
+                        if SSAType in ['TwoStims', 'TwoStimsPeriodic', 'TwoStimsPeriodicP9_29']:
+                            center_frequencies = [center_frequencies[0], center_frequencies[0][::-1]]
+                        
+                        for SSAType in SSATypes:
+                            for DisableUseDep in DisableUseDeps:
+                                for remove_SK_E2 in remove_SK_E2s:
+                                    for Disable_CortoCortical in Disable_CortoCorticals:
+                                        for Standard,Deviant in center_frequencies:
+                                            init_name = 'init_NoSK_E2.hoc' if remove_SK_E2 else 'init.hoc'
+                                            experiment['SSAType'] = SSAType
+                                            experiment['stand_dev_couple'] = [Standard,Deviant]
+
+                                            BS = seed*(int(experiment['tunning_width_gaussian_mean']*100)+100000)+Standard
+                                            path_for_simulations = set_main_path(BasePath, ca, k, DisableUseDep, Disable_CortoCortical, remove_SK_E2, SSA) + '/' + set_directory(experiment) +'/'
+                                            print path_for_simulations
+                                            if tm_text!='stop_asking': tm_text = raw_input('Is this path ok? ("stop_asking" will stop asking)')
+                                            if os.path.exists(path_for_simulations) and Standard == [6666,9600]:tm_text1 = raw_input('This path already exist (pass)'); 
+                                            if tm_text1=='pass': continue
+                                            create_path_and_copy_file(path_for_simulations)
+                                            spike_replay = path_for_simulations + '/SpikeFiles/input' + str(Standard) + '_' + `BS` + '.dat'
+                                            print(spike_replay)
+                                            run_name = str(Standard) + '_' + `BS` 
+                                            
+                                            ## need to use this one.
+                                            job_name =  'S' + `int(Standard)` +  '_D' + `int(Deviant)` +  '_' + path_for_simulations[path_for_simulations.index('/Ca')-5:]
 
 
+                                            #
+                                            # Chr options can be added here
+                                            #
+                                            
 
-                        Directory+= '_Pres' + str(experiment['ssa_presentations']) + '_resPro' + str(experiment['responsive_axons_probability']).replace('.','p')
-                        if SSA==1: Directory+= '_SSA_p' +  str(1-experiment['ssa_standard_probability']).replace('.','p') +  '_' + experiment['SSAType']
-                        return(Directory)
+                                            experiment['frequencies']     = SSA_protocol_stimulations(experiment, SSA)
+                                            _,axon_activity_vars = create_axons_spikes(BS, experiment, save_path=spike_replay );
 
+                                            f = open(path_for_simulations +'/BlueConfig_template','r')
+                                            blue_out = crate_blueconfig(BlueConfig_file=f, CurrentDir = path_for_simulations, BS = BS, simulation_duration = simulation_duration,
+                                                                                                    run_name=run_name, ca=ca, k=k, Mg=Mg,circuit_target = circuit_target, decouple=Disable_CortoCortical, optogenetic_vars=[],
+                                                                                                    DisableUseDep = DisableUseDep,reports=reports,
+                                                                                                    RunMode = RunMode, remove_spon_minis=remove_spon_minis, spike_replay=spike_replay, RNGMode=RNGMode)
+                                            f = open(path_for_simulations + 'BlueConfig_' + run_name, 'w')
+                                            f.write(blue_out)
+                                            f.close()
+                                            
+                                            
+                                            f = open(path_for_simulations +'/launchScript_bg_template.sh','r')
+                                            launch_out = create_launch_script(launchScript_file=f, hoc_lib=hoc_lib, init_name=init_name, special_path=special_path, simulation_time=simulation_time,
+                                                                                                                run_name=run_name, nice_level=nice_level, nodes=nodes, ntask_per_node=ntask_per_node, 
+                                                                                                                bbpviz_txt = bbpviz_txt, partition=partition, job_name=job_name, core_neuron=core_neuron)
+                                            f = open(path_for_simulations + 'launchScript_bg_' + run_name +'.sh', 'w')
+                                            f.write(launch_out)
+                                            if record_lfp==True:
+                                               f.write("\nssh bbpviz1.cscs.ch <<'ENDSSH' \n")
+                                               f.write('PATH="/gpfs/bbp.cscs.ch/home/amsalem/anaconda2/bin:$PATH"\n')
+                                               f.write('python /gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/general_scripts/LFP_calculator.py ' + path_for_simulations + 'BlueConfig_' + run_name + "\nENDSSH")
+                                               
+                                            f.close()
+                                            [axon_activity_vars[axon_gid].pop('time_to_firing_rate_frequency') for axon_gid in axon_activity_vars]
+                                            for axon_gid in axon_activity_vars:
+                                                axon_activity_vars[axon_gid]['alpha_func_delay'] = axon_activity_vars[axon_gid]['alpha_func_delay']() if experiment['alpha_func_delay_distribution']  == 'gaussian' else None
 
-                    SSATypes = ['TwoStimsPeriodic']
-                    #DisableUseDeps = [[], [('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
-                    DisableUseDeps =[[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
-                    #DisableUseDeps = [[]]#, [('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
-                    Disable_CortoCorticals = [False]
-                    remove_SK_E2s = [False]
-                    #for SSA simulations
-                    run_names = []
-
-                    for SSAType in SSATypes:
-                        for DisableUseDep in DisableUseDeps:
-                            for remove_SK_E2 in remove_SK_E2s:
-                                for Disable_CortoCortical in Disable_CortoCorticals:
-                                    for Standard,Deviant in [[6666,9600],[9600,6666]]:
-                                        init_name = 'init_NoSK_E2.hoc' if remove_SK_E2 else 'init.hoc'
-                                        experiment['SSAType'] = SSAType
-                                        experiment['stand_dev_couple'] = [Standard,Deviant]
-
-                                        BS = seed*(int(experiment['tunning_width_gaussian_mean']*100)+100000)+Standard
-                                        path_for_simulations = set_main_path(BasePath, ca, k, DisableUseDep, Disable_CortoCortical, remove_SK_E2, SSA) + '/' + set_directory(experiment) +'/'
-                                        print path_for_simulations
-                                        if tm_text!='stop_asking': tm_text = raw_input('Is this path ok? ("stop_asking" will stop asking)')
-                                        if os.path.exists(path_for_simulations) and Standard == [6666,9600]:tm_text1 = raw_input('This path already exist (pass)'); 
-                                        if tm_text1=='pass': continue
-                                        create_path_and_copy_file(path_for_simulations)
-                                        spike_replay = path_for_simulations + '/SpikeFiles/input' + str(Standard) + '_' + `BS` + '.dat'
-                                        print(spike_replay)
-                                        run_name = str(Standard) + '_' + `BS` 
-                                        
-                                        ## need to use this one.
-                                        job_name =  'S' + `int(Standard)` +  '_D' + `int(Deviant)` +  '_' + path_for_simulations[path_for_simulations.index('/Ca')-5:]
-
-
-                                        #
-                                        # Chr options can be added here
-                                        #
-                                        
-
-                                        experiment['frequencies']     = SSA_protocol_stimulations(experiment, SSA)
-                                        _,axon_activity_vars = create_axons_spikes(BS, experiment, save_path=spike_replay );
-
-                                        f = open(path_for_simulations +'/BlueConfig_template','r')
-                                        blue_out = crate_blueconfig(BlueConfig_file=f, CurrentDir = path_for_simulations, BS = BS, simulation_duration = simulation_duration,
-                                                                                                run_name=run_name, ca=ca, k=k, Mg=Mg,circuit_target = circuit_target, decouple=Disable_CortoCortical, optogenetic_vars=[],
-                                                                                                DisableUseDep = DisableUseDep,reports=reports,
-                                                                                                RunMode = RunMode, remove_spon_minis=remove_spon_minis, spike_replay=spike_replay)
-                                        f = open(path_for_simulations + 'BlueConfig_' + run_name, 'w')
-                                        f.write(blue_out)
-                                        f.close()
-                                        
-                                        
-                                        f = open(path_for_simulations +'/launchScript_bg_template.sh','r')
-                                        launch_out = create_launch_script(launchScript_file=f, hoc_lib=hoc_lib, init_name=init_name, special_path=special_path, simulation_time=simulation_time,
-                                                                                                            run_name=run_name, nice_level=nice_level, nodes=nodes, ntask_per_node=ntask_per_node, 
-                                                                                                            bbpviz_txt = bbpviz_txt, partition=partition, job_name=job_name)
-                                        f = open(path_for_simulations + 'launchScript_bg_' + run_name +'.sh', 'w')
-                                        f.write(launch_out)
-                                        if record_lfp==True:
-                                           f.write("\nssh bbpviz1.cscs.ch <<'ENDSSH' \n")
-                                           f.write('PATH="/gpfs/bbp.cscs.ch/home/amsalem/anaconda2/bin:$PATH"\n')
-                                           f.write('python /gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/general_scripts/LFP_calculator.py ' + path_for_simulations + 'BlueConfig_' + run_name + "\nENDSSH")
-                                           
-                                        f.close()
-                                        [axon_activity_vars[axon_gid].pop('time_to_firing_rate_frequency') for axon_gid in axon_activity_vars]
-                                        experiment['axon_activity_vars'] = axon_activity_vars
-                                        pickle.dump(experiment,open(path_for_simulations+ '/experiment_' + run_name + '.p','w'))
-                                        if not os.path.exists(path_for_simulations + '/' + run_name): #If folder already exist do not send it.
-                                            run_names.append('sbatch launchScript_bg_' + run_name +'.sh')
-                                    #as it is per directory I need to submit the jobs here!
-                                    submit_jobs(run_names, path_for_simulations, MaxJobs = 1,  all_after_one=True, ssh_path=ssh_path)
-                                    run_names = []
+                                            experiment['axon_activity_vars'] = axon_activity_vars
+                                            pickle.dump(experiment,open(path_for_simulations+ '/experiment_' + run_name + '.p','w'))
+                                            if not os.path.exists(path_for_simulations + '/' + run_name): #If folder already exist do not send it.
+                                                run_names.append('sbatch launchScript_bg_' + run_name +'.sh')
+                                        #as it is per directory I need to submit the jobs here!
+                                        submit_jobs(run_names, path_for_simulations, MaxJobs = 1,  all_after_one=True, ssh_path=ssh_path)
+                                        run_names = []
 #submit_jobs(run_names, path_for_simulations, MaxJobs = 2,  all_after_one=True, ssh_path=ssh_path)
                     
                 

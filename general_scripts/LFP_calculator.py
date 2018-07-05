@@ -134,7 +134,7 @@ def build_sbatch_script_CUDA(resolution):
     out_file = BlueConfig.split('/')[-1][11:]
     
     #ptxt = 'voxelize --volume "fivoxsomas:///' + BlueConfig + '?' + command + '&resolution=' + str(resolution) +  '" --times "0 12"'
-    ptxt = 'voxelize --volume "fivoxsomas:///' + BlueConfig + '?' + command + '&resolution=' + str(resolution) +  '" --times "0 ' + simulation_time + '"'
+    ptxt = 'voxelize --volume "fivoxcompartments:///' + BlueConfig + '?' + command + '&resolution=' + str(resolution) +  '" --times "0 ' + simulation_time + '"'
     values['ptxt'] = ptxt
     
     values['job_name'] = out_file

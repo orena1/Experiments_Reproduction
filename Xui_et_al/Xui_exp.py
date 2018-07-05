@@ -22,7 +22,6 @@ RunModeToNeurodamusPath = {'RunMode LoadBalance':['/gpfs/bbp.cscs.ch/project/pro
                         '#RunMode': ['/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/hoclib', '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/powerpc64/special']
                         }
 
-
 bbpviz1 = False
 
 if bbpviz1 == False:
@@ -32,10 +31,10 @@ if bbpviz1 == False:
     special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib/powerpc64/special'
     nodes = 512
     ntask_per_node = 32
-    partition = 'exception'
+    partition = 'prod'
     bbpviz_txt= ''
     ssh_path = 'bbpbg2.cscs.ch'
-    account  = 'proj64'
+    account  = 'proj2'
 else:
 ## for bbpviz1
     hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/hoclib'
@@ -54,11 +53,18 @@ else:
 
 remove_spon_minis = False
 run = '1'
-other_circuit = '/gpfs/bbp.cscs.ch/project/proj2/circuits/SomatosensoryCxS1-v5.r0_postprocessing'
+#other_circuit = '/gpfs/bbp.cscs.ch/project/proj2/circuits/SomatosensoryCxS1-v5.r0_postprocessing'
+other_circuit = False
 path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Xue_Nature_2014/31_01_2017/Ca' + \
                             str(ca).replace('.','p') + '_K' + str(k).replace('.','p') +'/Run_' +str(run)  +  '/Remove_Minis_' +str(remove_spon_minis) +'/var_' + str(var).replace('.','p').replace('-','_')+'/'
 if other_circuit is not False:
     path_for_simulations =path_for_simulations[:-1] + 'other_circuit/'
+
+NMDA_GAMMA  = True
+if NMDA_GAMMA==True:
+    path_for_simulations  = path_for_simulations.replace('Xue_Nature_2014/','Xue_Nature_2014/Gamma_')
+    special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib_NMDA/powerpc64/special'
+
 
 
 reports = {'soma_voltage':{
@@ -73,7 +79,9 @@ nice_level = 0
 opto_gen_stimstart = 2000
 simulation_duration = 2100
 
-seeds = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
+seeds = [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
+#seeds = [1,2]
+
 
 #amplitudes = [60,100,140,160,180,200,210,220,245,265] #Ca1p5 or Ca1p25
 #amplitudes = [40,80,100,120,140,160,170,175,180,200] #Ca2p5
