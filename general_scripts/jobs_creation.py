@@ -11,7 +11,7 @@ import subprocess
 
 def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_name, ca, k, Mg,
                     circuit_target='mc2_Column', decouple=False, optogenetic_vars = [], RunMode = 'RunMode LoadBalance', DisableUseDep = [], reports={}, remove_spon_minis=False,
-                    spike_replay=None, other_circuit=False, v_clamp = {}, RNGMode = 'Compatibility'):
+                    spike_replay=None, other_circuit=False, v_clamp = {}, RNGMode = 'Compatibility', gap_junction_path=None):
 
     '''
     v_clamp example - v_clamp[voltage][target] -- v_clamp[-80][L2_PC,L5_PC]
@@ -44,6 +44,9 @@ def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_n
         elif 'Duration' in line and RunBlock:
             newF += '         Duration ' + `simulation_duration`+'\n'
         elif 'Reports' in line:
+            if gap_junction_path!=None:
+                newF += GapJunctionTxt.replace('GJ_PATH',gap_junction_path)
+            
             for report_type in reports:
                 if report_type=='soma_voltage':
                     newF += Voltage_Report.replace('REPORT_TARGET',reports['soma_voltage']['REPORT_TARGET']).replace('START_TIME',reports['soma_voltage']['START_TIME']).replace('END_TIME',reports['soma_voltage']['END_TIME'])
@@ -135,6 +138,8 @@ def create_launch_script(launchScript_file, hoc_lib, init_name, special_path, si
             newF += line.replace('BlueConfig','BlueConfig_' + run_name).replace('init.hoc',init_name).replace('binPath',special_path) + '\n'
             if core_neuron==True:
                 newF += 'srun --mpi=pmi2 $CORENEURON_EXE -mpi --read-config ' + run_name +'/sim.conf\n'
+                newF += 'sleep 15\n'
+                newF += 'rm -fr ' + run_name + '/coreneuron_input \n'
         else:
                 newF += line
     return(newF)
@@ -227,7 +232,7 @@ Voltage_Report = 'Report soma\n'\
 
 LFP_Report = 'Report AllCompartmentsMembrane\n'\
 '{\n'\
-'        Target mc2_Column\n'\
+'        Target AllCompartments\n'\
 '          Type Summation\n'\
 '      ReportOn i_membrane IClamp\n'\
 '          Unit nA\n'\
@@ -331,4 +336,15 @@ ReportSEClampTxt = 'Report SEClamp_i\n'\
 '       EndTime 250000\n'\
 '}\n\n'
 
+
+GapJunctionTxt ='''
+Projection gapjunction
+{
+        # can use absolute path
+       Path GJ_PATH
+       Type GapJunction
+        Source Non
+}
+
+'''
 

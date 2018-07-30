@@ -143,6 +143,11 @@ experiment['first_stimulus_time']     = 2000
 
 experiment['ssa_presentations']     = 500
 experiment['ssa_standard_probability'] = 0.95
+
+experiment['ssa_presentations']     = 100
+experiment['ssa_standard_probability'] = 0.9
+
+
 experiment['ssa_presentations_seed'] = 1 
 
 experiment['spontaneous_firing_rate_type'] = 'constant' #When I have sontaneuos firing rate, it will be added to the osi firing rate, which means that the firing rate will be higher than the one which was set in the 
@@ -157,7 +162,7 @@ experiment['prefered_frequency_boundaries'] = [5660, 11310] # 1 octave
 #experiment['prefered_frequency_boundaries'] = [4000, 16000] # 2 octvaes
 
 
-simulation_time = "52:00:00" # real run time
+simulation_time = "24:00:00" # real run time
 simulation_duration = experiment['simulation_end_time']   # bilogical time
 
 #Tunning curve
@@ -204,19 +209,65 @@ if Amp==40:
     experiment['axon_stim_firing_rate_gaussian_mean']       = float(470)
     experiment['axon_stim_firing_rate_gaussian_std']       = float(180)
 
-# old values for Amp 30 or 40
-experiment['alpha_func_delay_distribution'] = 'gaussian'
-experiment['alpha_func_delay_gaussian_mean'] = float(16.2 - 10) ## I remove 10 ms so I will not need to fix the concept that each presentation is 30 ms!
-experiment['alpha_func_delay_gaussian_std'] = float(4.2)
-# values for freq_corr mean of all amplitudes 
-experiment['alpha_func_delay_distribution'] = 'frequency_correlated'
-experiment['delays_gaus_base_line'] = float(18) ## I remove 10 ms so I will not need to fix the concept that each presentation is 30 ms!
-experiment['delays_gaus_norm_factor'] = float(7)
-experiment['delays_gaus_std'] = float(0.8)
 
-experiment['alpha_func_tau_distribution'] = 'gaussian'
-experiment['alpha_func_tau_gaussian_mean'] = float(2.7)
-experiment['alpha_func_tau_gaussian_std']  = float(1.3)
+
+
+#Read Data from fit!
+
+amp_to_dist_vals = {}
+
+amp_to_dist_vals[30] = {'tun_width_dist': 'exp', 'w_exp_scale':0.231, 'w_exp_loc': 0.64, 'fr_dist':'gaussian', 'fr_guas_mean': 92, 'fr_gaus_std':64, 'alph_func_dist':'gaussian', 'alph_tau_mean': 4.0, 'alph_tau_std':2.1,
+'delay_gaus_norm_f': 8.54, 'delay_gaus_std':0.185}
+amp_to_dist_vals[40] = {'tun_width_dist': 'exp', 'w_exp_scale':0.685, 'w_exp_loc': 0.14, 'fr_dist':'gaussian', 'fr_guas_mean': 18952, 'fr_gaus_std':45651, 'alph_func_dist':'gaussian', 'alph_tau_mean': 2.0, 'alph_tau_std':1.7,
+'delay_gaus_norm_f': 4.06, 'delay_gaus_std':2.28}
+amp_to_dist_vals[50] = {'tun_width_dist': 'exp', 'w_exp_scale':0.658, 'w_exp_loc': 0.37, 'fr_dist':'gaussian', 'fr_guas_mean': 399, 'fr_gaus_std':192, 'alph_func_dist':'gaussian', 'alph_tau_mean': 2.2, 'alph_tau_std':0.84,
+'delay_gaus_norm_f': 10.3, 'delay_gaus_std':1.18}
+amp_to_dist_vals[60] = {'tun_width_dist': 'exp', 'w_exp_scale':0.919, 'w_exp_loc': 0.24, 'fr_dist':'gaussian', 'fr_guas_mean': 484, 'fr_gaus_std':220, 'alph_func_dist':'gaussian', 'alph_tau_mean': 2.3, 'alph_tau_std':0.99,
+'delay_gaus_norm_f': 8.67, 'delay_gaus_std':1.59}
+amp_to_dist_vals[70] = {'tun_width_dist': 'exp', 'w_exp_scale':1.07, 'w_exp_loc': 0.36, 'fr_dist':'gaussian', 'fr_guas_mean': 486, 'fr_gaus_std':174, 'alph_func_dist':'gaussian', 'alph_tau_mean': 2.4, 'alph_tau_std':0.88,
+'delay_gaus_norm_f': 8.09, 'delay_gaus_std':1.87}
+amp_to_dist_vals[80] = {'tun_width_dist': 'exp', 'w_exp_scale':1.39, 'w_exp_loc': 0.67, 'fr_dist':'gaussian', 'fr_guas_mean': 489, 'fr_gaus_std':129, 'alph_func_dist':'gaussian', 'alph_tau_mean': 2.6, 'alph_tau_std':1.1,
+'delay_gaus_norm_f': 4.58, 'delay_gaus_std':2.4}
+amp_to_dist_vals[90] = {'tun_width_dist': 'exp', 'w_exp_scale':1.72, 'w_exp_loc': 0.86, 'fr_dist':'gaussian', 'fr_guas_mean': 529, 'fr_gaus_std':183, 'alph_func_dist':'gaussian', 'alph_tau_mean': 2.7, 'alph_tau_std':1.4,
+'delay_gaus_norm_f': 4.88, 'delay_gaus_std':4.22}
+        
+        
+        
+
+
+### #set values for amp
+##--------
+experiment['tunning_width_distribution']       = amp_to_dist_vals[amp]['tun_width_dist']
+experiment['tunning_width_exp_scale']          = amp_to_dist_vals[amp]['w_exp_scale']
+experiment['tunning_width_exp_loc']            = amp_to_dist_vals[amp]['w_exp_loc']
+
+experiment['axon_stim_firing_rate_distribution']       = amp_to_dist_vals[amp]['fr_dist']
+experiment['axon_stim_firing_rate_gaussian_mean']       = amp_to_dist_vals[amp]['fr_guas_mean']
+experiment['axon_stim_firing_rate_gaussian_std']       = amp_to_dist_vals[amp]['fr_gaus_std']
+
+experiment['alpha_func_tau_distribution'] = amp_to_dist_vals[amp]['alph_func_dist']
+experiment['alpha_func_tau_gaussian_mean'] = amp_to_dist_vals[amp]['alph_tau_mean']
+experiment['alpha_func_tau_gaussian_std']  = amp_to_dist_vals[amp]['alph_tau_std']
+
+experiment['alpha_func_delay_distribution'] = 'frequency_correlated'
+experiment['delays_gaus_norm_factor'] = amp_to_dist_vals[amp]['delay_gaus_norm_f']
+experiment['delays_gaus_std']         = amp_to_dist_vals[amp]['delay_gaus_std']
+experiment['delays_gaus_base_line'] = float(18) ## I remove 10 ms so I will not need to fix the concept that each presentation is 30 ms!
+
+##--------
+
+
+
+## old values for Amp 30 or 40
+#experiment['alpha_func_delay_distribution'] = 'gaussian'
+#experiment['alpha_func_delay_gaussian_mean'] = float(16.2 - 10) ## I remove 10 ms so I will not need to fix the concept that each presentation is 30 ms!
+#experiment['alpha_func_delay_gaussian_std'] = float(4.2)
+## values for freq_corr mean of all amplitudes 
+#experiment['alpha_func_delay_distribution'] = 'frequency_correlated'
+#experiment['delays_gaus_base_line'] = float(18) ## I remove 10 ms so I will not need to fix the concept that each presentation is 30 ms!
+#experiment['delays_gaus_norm_factor'] = float(7)
+#experiment['delays_gaus_std'] = float(0.8)
+
 
 experiment['duration_of_stim']             = 300 
 experiment['duration_between_stims']       = 0  #End to start
@@ -292,14 +343,25 @@ k_vals = [float(4.0),float(4.5),float(4.9)]
 
 del_std_couples = [[float(4),float(0.8)], [float(6),float(0.8)], [float(8),float(0.8)], [float(10),float(0.)], [float(7),float(0.4)], [float(7),float(0.6)], [float(7),float(1)]]
 
-del_std_couples = [[float(15),float(0.4)], [float(15),float(0.5)], [float(10),float(0.2)],[float(10),float(0.3)], [float(14),float(0.3)]]
+del_std_couples = [[float(15),float(0.4)], [float(15),float(0.5)], [float(10),float(0.2)],[float(10),float(0.3)], [float(14),float(0.3)], [float(6),float(0.8)]]
 
-del_std_couples = [[float(15),float(0.4)],[float(6),float(0.8)]]
+#del_std_couples = [[float(15),float(0.4)],[float(6),float(0.8)]]
 
-Ca_vals = [1.25]
-k_vals = [float(4.0)]
+del_std_couples = [[float(10),float(0.2)], [float(15),float(0.4)]]
 
-del_std_couples = [[float(15),float(0.4)]]
+Ca_vals = [1.23]
+k_vals = [float(4.06)]#, float(4.12), float(4.18)]
+
+
+del_std_couples = [[float(10),float(0.2)], [float(15),float(0.4)], [float(0),float(0)]]
+
+
+Ca_vals = [1.23]
+k_vals = [float(4.1),float(4.12),float(4.15)]
+
+
+
+#del_std_couples = [[float(15),float(0.4)]]
 
 for experiment['delays_gaus_norm_factor'],experiment['delays_gaus_std'] in del_std_couples:
     #Set all delays to the same value
@@ -317,21 +379,22 @@ for experiment['delays_gaus_norm_factor'],experiment['delays_gaus_std'] in del_s
                         experiment['axon_stim_firing_rate_gaussian_mean'] = axon_stim_fr
                         SSA = 1
                         seed = 1
-                        SSATypes = ['DiverseBroadExpR']
+                        SSATypes = ['TwoStims']
                         #SSATypes = ['Equal']; experiment['ssa_standard_probability'] = 0.5
                         #DisableUseDeps = [[], [('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
                         #DisableUseDeps =[[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
-                        DisableUseDeps = [[]]#,[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
+                        DisableUseDeps = [[],[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
                         
                         Disable_CortoCorticals = [False]
                         remove_SK_E2s = [False]
                         #for SSA simulations
                         run_names = []
                         
-                        if SSAType in ['TwoStims', 'TwoStimsPeriodic', 'TwoStimsPeriodicP9_29']:
-                            center_frequencies = [center_frequencies[0], center_frequencies[0][::-1]]
+
                         
                         for SSAType in SSATypes:
+                            if SSAType in ['TwoStims', 'TwoStimsPeriodic', 'TwoStimsPeriodicP9_29']:
+                                center_frequencies = [center_frequencies[0], center_frequencies[0][::-1]]
                             for DisableUseDep in DisableUseDeps:
                                 for remove_SK_E2 in remove_SK_E2s:
                                     for Disable_CortoCortical in Disable_CortoCorticals:

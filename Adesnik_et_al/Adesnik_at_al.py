@@ -12,6 +12,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 import bluepy
 import pickle
+from bluepy.v2 import Cell
 
 execfile('../general_scripts/jobs_creation.py')
 execfile('../general_scripts/opto_gen_protocols.py')
@@ -51,6 +52,7 @@ else:
 
     
     
+
 
 
 def add_to_user_target(gids, target_name, path_for_simulations):
@@ -122,23 +124,28 @@ groups = False
 groups = '' if  groups == False else '_groups'
 
 
-groups = 'loc_based'
-run = '1_full'
+#groups = 'loc_based'
+groups = 'L23_PC@0.23'
+run = '1_full_comp_gjs0p5'
 
 
-path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Cardin_Nature_2009/23_07_2018/Ca' + \
+high_gamma = True # True|False
+if high_gamma==True:
+    special_path = special_path.replace('lib/','lib_gamma/')
+    run += '_high_gamma'
+
+
+path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Adesnik_Nature_2010/5_08_2018/Ca' + \
                             str(ca).replace('.','p') + '_K' + str(k).replace('.','p') +'/Run_' +str(run)  +  '/Remove_Minis_' +str(remove_spon_minis) +'/var_' + str(var).replace('.','p').replace('-','_')+'/'
 
-#hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/hoclib'
-#init_name = 'init.hoc'
-#special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master06_11_16/neurodamus/lib/powerpc64/special'
+
 
 
 
 reports = {'soma_voltage':{
         'REPORT_TARGET':'mc2_Column',
         'START_TIME':str(1900),
-        'END_TIME':str(2500)}}
+        'END_TIME':str(4200)}}
 
 RunMode = 'RunMode LoadBalance'
 record_lfp = True
@@ -150,11 +157,10 @@ if record_lfp:
 circuit_target = "mc2_Column"
 
 simulation_time = "24:00:00"
-nice_level = 0
+nice_level = 1000
 
 opto_gen_stimstart = 2000
-stim_durations = 3000 #Don't use 0.5 ms
-simulation_duration = 5200
+simulation_duration = 4200
 
 seeds = [1]
 
@@ -163,16 +169,22 @@ seeds = [1]
 pulse_widths = [2.5]
 amplitudes = [100]
 amplitudes = map(float,amplitudes)
-freqs = [0,2,4,8,16,32,40,48,60,70,80,100,200]
+
 
 ### This is for groups
 ind = 0
-base_activation = 400
-ba  = base_activation
-activations = [[0.7,ba * 1], [0.65,ba*0.90], [0.60,ba*0.80], [0.12,ba*0.70], [0.02,ba*0.20],
-              [0.20,ba*0.50],  [0.15,ba*0.40], [0.08,ba*0.30], [0.02,ba*0.20]  , [0.01,ba*0.5]]
+#base_activation = 400
+#ba  = base_activation
+#activations = [[0.7,ba * 1], [0.65,ba*0.90], [0.60,ba*0.80], [0.12,ba*0.70], [0.02,ba*0.20],
+              #[0.20,ba*0.50],  [0.15,ba*0.40], [0.08,ba*0.30], [0.02,ba*0.20]  , [0.01,ba*0.5]]
               
-path_for_simulations = path_for_simulations + 'BA_' + str(base_activation) +'/'
+#path_for_simulations = path_for_simulations + 'BA_' + str(base_activation) +'/'
+gamma_val =0.062 # only two option available 0.062 or 0.08
+if gamma_val!=0.062:
+    if gamma_val!=0.08: raise Exception('Does not work!')
+    path_for_simulations + '/gamma_0p08/'
+    
+
 
 model_folders = '../O1_v5/'
 FilesToCopy = ['launchScript_bg_template.sh', 'inputs.dat', 'user.target', 'BlueConfig_template']
@@ -192,75 +204,85 @@ run_names = []
 #activations = [[1,100], [1,90], [1,80], [1,70], [1,20],
                #[1,50],  [1,40], [1,30], [1,20]  , [1,5]]
 
+if groups=='loc_based':
+    spatial_data = {}
+    for i in [[0,200],[200,9e9]]:
+        for layer in [[1767.937, 1916.8004], [1415, 1767.92], [1225.438, 1414.999], [700.38, 1225.4], [ 0.0, 700.365]]:
+            spatial_data['group' + str(ind)] = {'xz_radius_start':i[0],'xz_radius_end':i[1],'y_step_start':layer[0],'y_step_end':layer[1] \
+                                        ,'cell_percent':activations[ind][0],'power':activations[ind][1]}
+            ind+=1
+    
+    create_groups(spatial_data, 'xz_radius_y_step', neuron_type = 'PV_FS')
 
-spatial_data = {}
-for i in [[0,200],[200,9e9]]:
-    for layer in [[1767.937, 1916.8004], [1415, 1767.92], [1225.438, 1414.999], [700.38, 1225.4], [ 0.0, 700.365]]:
-        spatial_data['group' + str(ind)] = {'xz_radius_start':i[0],'xz_radius_end':i[1],'y_step_start':layer[0],'y_step_end':layer[1] \
-                                    ,'cell_percent':activations[ind][0],'power':activations[ind][1]}
-        ind+=1
+cells_group = 'PV_FS'
 
-create_groups(spatial_data, 'xz_radius_y_step', neuron_type = 'PV_FS')
-
-
+if '@' in groups:
+    selsect_rnd = np.random.RandomState(6)
+    cell_type, percent = groups.split('@')
+    Circ  = bluepy.Circuit(generalConfigPath)
+    cells = Circ.v2.cells.get({'$target': 'mc2_Column', Cell.MTYPE: cell_type})
+    gids_per_group = np.sort(selsect_rnd.choice(list(cells.index), size=int(len(list(cells.index))*float(percent)), replace=False))
+    groups = groups.replace('@','at').replace('.','p')
+    add_to_user_target(gids_per_group, groups,  path_for_simulations)
+    cells_group = groups
 ### test
 #seeds = [1]
 #freqs = [40]
 ###
 
 
-
-amplitudes = [0]
+amplitudes_start_nd_end = np.array([[0,50], [0,100], [0,200], [0,400], [0,800]])
+amplitudes_start_nd_end = amplitudes_start_nd_end.astype('float')
 for seed in seeds:
-    for amp in amplitudes:
-        for pulse_width in pulse_widths:
-            for freq in freqs:
-                dur = stim_durations
-                BS = seed*1000000 + int(amp*10) + int(pulse_width*10000) + int(freq*1000)
-                run_name = 'freq' + `float(freq)`.replace('.','p') +  '_amp' + `float(amp)`.replace('.','p') + '_pulse_width' + `float(pulse_width)`.replace('.','p') + '_BS' + `BS`
-                stim_vars = {'PV_FS':[{'amp':amp,'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}]}
-                morphs = ['PV_FS']
-                if groups=='_groups':
-                    stim_vars = {'L23_PV':[{'amp':amp,'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}],
-                                'L4_PV':[{'amp':amp*0.5,'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}],
-                                'L5_PV':[{'amp':amp*0.3,'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}],
-                                'L6_PV':[{'amp':amp*0.15,'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}],}
-                    morphs = ['L23_PV', 'L4_PV', 'L5_PV', 'L6_PV']
-                
-                if groups == 'loc_based':
-                    stim_vars = {group_name:[{'amp':spatial_data[group_name]['power'],'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}] for group_name in spatial_data}
-                    morphs = spatial_data.keys()
-                
-                
-                f = open(path_for_simulations +'/BlueConfig_template','r')
-                blue_out = crate_blueconfig(BlueConfig_file=f, CurrentDir = path_for_simulations, BS = BS, simulation_duration = simulation_duration,
-                                                                        run_name=run_name, ca=ca, k=k, Mg=Mg,circuit_target = circuit_target, optogenetic_vars=['pulse_train', morphs, stim_vars],reports=reports,
-                                                                        RunMode = RunMode, remove_spon_minis=remove_spon_minis)
-                f = open(path_for_simulations + 'BlueConfig_' + run_name, 'w')
-                f.write(blue_out)
-                f.close()
-                
-                
-                f = open(path_for_simulations +'/launchScript_bg_template.sh','r')
-                launch_out = create_launch_script(launchScript_file=f, hoc_lib=hoc_lib, init_name=init_name, special_path=special_path, simulation_time=simulation_time,
-                                                                                    run_name=run_name, nice_level=nice_level, nodes=nodes, ntask_per_node=ntask_per_node, 
-                                                                                    bbpviz_txt = bbpviz_txt, partition=partition)
-                f = open(path_for_simulations + 'launchScript_bg_' + run_name +'.sh', 'w')
-                f.write(launch_out)
-                if record_lfp==True:
-                   f.write("\nssh bbpviz1.bbp.epfl.ch <<'ENDSSH' \n")
-                   f.write('PATH="/gpfs/bbp.cscs.ch/home/amsalem/anaconda2/bin:$PATH"\n')
-                   f.write('python /gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/general_scripts/LFP_calculator.py ' + path_for_simulations + 'BlueConfig_' + run_name + "\nENDSSH")
-                   
-                f.close()
-                if not os.path.exists(path_for_simulations + '/' + run_name): #If folder already exist do not send it.
-                    run_names.append('sbatch launchScript_bg_' + run_name +'.sh')
+    for amp_start, amp_end in amplitudes_start_nd_end:
+        dur = 2000
+        BS = seed*1000000 + int(amp_start*10) + int(dur*10000) + int(amp_end*1000)
+        run_name = 'dur' + `float(dur)`.replace('.','p') +  '_amps' + `float(amp_start)`.replace('.','p') +  '_ampse' + `float(amp_end)`.replace('.','p')  + '_BS' + `BS`
+        stim_vars = {cells_group:[{'amp_start':amp_start,'amp_end':amp_end, 'start':opto_gen_stimstart, 'dur':dur}]}
+        morphs = [cells_group]
+        
+        
+        #if groups=='_groups':
+            #stim_vars = {'L23_PV':[{'amp':amp,'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}],
+                        #'L4_PV':[{'amp':amp*0.5,'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}],
+                        #'L5_PV':[{'amp':amp*0.3,'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}],
+                        #'L6_PV':[{'amp':amp*0.15,'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}],}
+            #morphs = ['L23_PV', 'L4_PV', 'L5_PV', 'L6_PV']
+        
+        #if groups == 'loc_based':
+            #stim_vars = {group_name:[{'amp':spatial_data[group_name]['power'],'start':opto_gen_stimstart,'dur':dur, 'var':amp*var, 'pulse_width': pulse_width , 'freq': freq}] for group_name in spatial_data}
+            #morphs = spatial_data.keys()
+        
+        
+        f = open(path_for_simulations +'/BlueConfig_template','r')
+        blue_out = crate_blueconfig(BlueConfig_file=f, CurrentDir = path_for_simulations, BS = BS, simulation_duration = simulation_duration,
+                                                                run_name=run_name, ca=ca, k=k, Mg=Mg,circuit_target = circuit_target, optogenetic_vars=['ramp_current_injections', morphs, stim_vars],reports=reports,
+                                                                RunMode = RunMode, remove_spon_minis=remove_spon_minis)
+        f = open(path_for_simulations + 'BlueConfig_' + run_name, 'w')
+        f.write(blue_out)
+        f.close()
+        
+        
+        f = open(path_for_simulations +'/launchScript_bg_template.sh','r')
+        launch_out = create_launch_script(launchScript_file=f, hoc_lib=hoc_lib, init_name=init_name, special_path=special_path, simulation_time=simulation_time,
+                                                                            run_name=run_name, nice_level=nice_level, nodes=nodes, ntask_per_node=ntask_per_node, 
+                                                                            bbpviz_txt = bbpviz_txt, partition=partition)
+        f = open(path_for_simulations + 'launchScript_bg_' + run_name +'.sh', 'w')
+        f.write(launch_out)
+        if record_lfp==True:
+            f.write("\nssh bbpviz1.bbp.epfl.ch <<'ENDSSH' \n")
+            f.write('PATH="/gpfs/bbp.cscs.ch/home/amsalem/anaconda2/bin:$PATH"\n')
+            f.write('python /gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/general_scripts/LFP_calculator.py ' + path_for_simulations + 'BlueConfig_' + run_name + "\nENDSSH")
+            
+        f.close()
+        if not os.path.exists(path_for_simulations + '/' + run_name): #If folder already exist do not send it.
+            run_names.append('sbatch launchScript_bg_' + run_name +'.sh')
 
-submit_jobs(run_names, path_for_simulations, MaxJobs = 1,  all_after_one=True, ssh_path=ssh_path)
+#submit_jobs(run_names, path_for_simulations, MaxJobs = 1,  all_after_one=True, ssh_path=ssh_path)
                     
                 
 
-BlueConfig = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Cardin_Nature_2009/31_07_2017/Ca1p23_K5p0/Run_2_LFP/Remove_Minis_False/var_1e_06/BlueConfig_freq40p0_amp3000p0_pulse_width2p5_BS1095000'
+#BlueConfig = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Cardin_Nature_2009/31_07_2017/Ca1p23_K5p0/Run_2_LFP/Remove_Minis_False/var_1e_06/BlueConfig_freq40p0_amp3000p0_pulse_width2p5_BS1095000'
 
 
 

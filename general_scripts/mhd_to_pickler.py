@@ -85,4 +85,4 @@ for f in sorted_files:
 print("Done deleting files")
 #delete_current_file.
 
-os.remove("AllCompartmentsMembrane.bbp")
+#os.remove("AllCompartmentsMembrane.bbp")
