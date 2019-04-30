@@ -18,7 +18,7 @@ execfile('../general_scripts/opto_gen_protocols.py')
 generalConfigPath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/AudInput12_4_16/SSA/Ca1p23/EE0_EI0_IE0_II0_TM_0/Freq_Tono_4to16_FR_S100_W_S0p2_TwoStimsExp/BlueConfig6666_106686'
 #print  'Loading all  took ' +  `time.time() - STloadTM` + ' secs'
 blue_config_circ = bluepy.Circuit(generalConfigPath)
-projection_path = '/gpfs/bbp.cscs.ch/project/proj1/circuits/SomatosensoryCxS1-v5.r0/O1/merged_circuit/ncsThalamocortical_VPM_tcS2F_2p6_ps'
+
 
 def set_directory(experiment):
     if round(experiment['prefered_frequency_boundaries'][0]/1000.0,2) != round(experiment['prefered_frequency_boundaries'][0]/1000.0,3) or round(experiment['prefered_frequency_boundaries'][1]/1000.0,2) != round(experiment['prefered_frequency_boundaries'][1]/1000.0,3):
@@ -37,9 +37,9 @@ def set_directory(experiment):
             Directory+= '_del_m' + str(experiment['alpha_func_delay_gaussian_mean']).replace('.','p') + '_std' + str(experiment['alpha_func_delay_gaussian_std']).replace('.','p')
         Directory+= '_tau_m' + str(experiment['alpha_func_tau_gaussian_mean']).replace('.','p') + '_std' + str(experiment['alpha_func_tau_gaussian_std']).replace('.','p')
 
-    Directory+= '_Pres' + str(experiment['ssa_presentations']) + '_resPro' + str(experiment['responsive_axons_probability']).replace('.','p') + '_sponFR' + str(experiment['spontaneous_firing_rate_value']).replace('.','p')
+    Directory+= '_Pres' + str(experiment['ssa_presentations']) + '_resPro' + str(experiment['responsive_axons_probability']).replace('.','p')
     if SSA==1: Directory+= '_SSA_p' +  str(1-experiment['ssa_standard_probability']).replace('.','p') +  '_' + experiment['SSAType']
-    if experiment['circuit_target'] not in ["mc2_Column", 'O1_slice_mc2', 'Mosaic']:
+    if experiment['circuit_target']!="mc2_Column":
         Directory+= '/mc2_X' + `experiment['circuit_target']['x'][0]`.replace('-','m') + 'to'+ `experiment['circuit_target']['x'][1]`.replace('-','m') + \
                         '_Y' + `experiment['circuit_target']['y'][0]`.replace('-','m') + 'to'+ `experiment['circuit_target']['y'][1]`.replace('-','m') + \
                         '_Z' + `experiment['circuit_target']['z'][0]`.replace('-','m') + 'to'+ `experiment['circuit_target']['z'][1]`.replace('-','m') +'/'
@@ -60,20 +60,48 @@ core_neuron = True
 knl = True
 cluster = 'neuron_coreneuron' # bbpv1 # bbpviz1 # bbpv1core_neuron
 
-if cluster == 'neuron_coreneuron':
-    base_dir = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master_Core_22_9_18/soft'  # 'Master_Core_22_9_18' # use this Master_Core_28_12_18 to record voltage
+if cluster == 'bbpviz1':
+    ## for bbpbg1
+    raise Exception('not_working_yet')
+elif cluster == 'bbpv1':
+    ## for bbpv1
+    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/hoclib'
+    init_name = 'init.hoc'
+    special_path = '--mpi=pmi2 /gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/x86_64/special -mpi'
+    nodes = 24
+    ntask_per_node = 36
     partition = 'prod'
+    bbpviz_txt = 'module load nix/hdf5/1.10.1 intel-parallel-studio/cluster.2018.1\n'\
+                     'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/bbpviz1NeuRep/reportinglib/install/lib64\n\n'
+    ssh_path = 'bbpv1.epfl.ch'
+elif cluster == 'bbpv1core_neuron':
+    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/sources/neurodamus/lib_gamma/hoclib'
+    init_name = 'init.hoc'
+    special_path = '''--mpi=pmi2 $NEURON_EXE -mpi -c 'strdef simulator' -c simulator='"CORENEURON"' '''
+    nodes = 16
+    ntask_per_node = 36
+    partition = 'prod'
+    bbpviz_txt = 'module load intel-parallel-studio/cluster.2018.1\n\n'\
+                  'export NEURON_EXE=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/sources/neurodamus/lib_gamma/x86_64/special\n'\
+                  'export CORENEURON_EXE=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/install/bin/coreneuron_exec\n' \
+                  'export HOC_LIBRARY_PATH=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/sources/neurodamus/lib/hoclib\n' \
+                  'export LD_LIBRARY_PATH=/gpfs/bbp.cscs.ch/project/proj2/Programs/CoreNeuron_12_4_18/bbp5/install/lib64:$LD_LIBRARY_PATH\n'
+
+    ssh_path = 'bbpv1.epfl.ch'
+    core_neuron = True
+    
+elif cluster == 'neuron_coreneuron':
+    base_dir = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master_Core_22_9_18/soft'
     if change_gamma:
         base_dir = base_dir.replace('soft', 'soft_gamma')
     if knl == True:
-        partition = 'prod_knl'
         base_dir = base_dir.replace('soft_gamma','soft_gamma_knl')
         if change_gamma==False: 
-            base_dir = sbase_dir.replace('soft','soft_knl')
+            base_dir = base_dir.replace('soft','soft_knl')
     hoc_lib = base_dir + '/sources/neurodamus/lib/hoclib'
     init_name = 'init.hoc'
     special_path = ''' special -mpi '''
-    
+    partition = 'prod'
     bbpviz_txt =  'module load hpe-mpi nix/cmake\n\n'\
                   'export BASE_DIR=' + base_dir + '\n'\
                   'export LD_LIBRARY_PATH=$BASE_DIR/install/lib64:$BASE_DIR/install/lib:$LD_LIBRARY_PATH\n'\
@@ -83,7 +111,7 @@ if cluster == 'neuron_coreneuron':
         nodes = 55
         ntask_per_node = 64
     else:
-        nodes = 96
+        nodes = 16
         ntask_per_node = 36
 
 
@@ -94,13 +122,6 @@ reports = {}
 RNGMode = 'Random123'
 
 RunMode = 'RunMode LoadBalance'
-
-#raw_input('I am not recording LFP, remember to change BasePath, cluster and record_lfp! number of nodes!')
-# nodes = 96
-# ntask_per_node = 36
-# if nodes==96:
-    # raw_input('Delete change in number of nodes!')
-
 record_lfp = False
 if record_lfp: 
     reports['LFP'] = {'START_TIME':str(0), 'END_TIME':str(9e9),'DT':str(0.1)}
@@ -141,12 +162,8 @@ def create_path_and_copy_file(path_for_simulations):
 
 
 
-BasePath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/AudInput28_01_19/SSA/'
-BasePath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/AudInput28_01_19/SSA/test_delete1'
+BasePath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/AudInput23_09_18/SSA/'
 
-if change_gamma==False:
-    BasePath.replace('AudInput23_09_18', 'AudInput23_09_18_low_gamma')
-    print('Change gamma path!')
 
 experiment = {}
 
@@ -267,8 +284,6 @@ def set_exp_by_amp(amp):
 
 ##--------
 
-first_time = 1
-
 check_amp_on_csi_control = False
 check_amp_on_csi_control_same_fr = False
 if check_amp_on_csi_control and check_amp_on_csi_control_same_fr:
@@ -292,78 +307,29 @@ experiment['duration_between_stims']       = 0  #End to start
 experiment['responsive_axons_probability'] = float(0.58)
 
 
-#'''
-####
-# This code change the column to  the slice! jupnotepads/SSA_analysis/Create_column_slice.ipynb
-#circuit_target = 'O1_slice_mc2'
-
-#experiment['prefered_frequency_boundaries'] = [2310, 27690]  # 3.583 octaves per mm # fits mc2 [4000,16000] ->  2 octvaes
-##experiment['prefered_frequency_boundaries'] = [3150, 20300] # 2.68 octaves per mm # fits mc2 [4760, 13450] -> 1.5 octaves
-##experiment['prefered_frequency_boundaries'] = [4300, 14880] # 1.79 octaves per mm # fits mc2 [5660, 11310] -> 1 octave
-
-##experiment['prefered_frequency_boundaries'] = [3730, 17150] # 2.2 octaves per mm
-#projection_path = '/gpfs/bbp.cscs.ch/project/proj32/BlobStim/proj_test_O1/s2f'
-
-#AxoGidToXY = pickle.load(open(os.environ['HOME'] + '/axon_gid_to_location_O1_slice_mc2.pkl','r'))
-#experiment['axons_settings']  = [AxoGidToXY]
-#if 'SSA' not in BasePath: raise Exception('not setted for FRA yet!')
-#BasePath = BasePath.replace('SSA','O1_slice_mc2/SSA')
-# End
-####
-#'''
-
-'''
-####
-# This code change the column to  Mosaic ! jupnotepads/SSA_analysis/Create_column_slice.ipynb
-circuit_target = 'Mosaic'
-
-experiment['prefered_frequency_boundaries'] = [1800, 35500]  # 3.583 octaves per mm # fits mc2 [4000,16000] ->  2 octvaes
-#experiment['prefered_frequency_boundaries'] = [2620, 24460] # 2.68 octaves per mm # fits mc2 [4760, 13450] -> 1.5 octaves
-#experiment['prefered_frequency_boundaries'] = [3800, 16850] # 1.79 octaves per mm # fits mc2 [5660, 11310] -> 1 octave
-
-#experiment['prefered_frequency_boundaries'] = [3200, 19970] # 2.2 octaves per mm
-projection_path = '/gpfs/bbp.cscs.ch/project/proj32/BlobStim/proj_test_O1/s2f'
-
-AxoGidToXY = pickle.load(open(os.environ['HOME'] + '/AxoGidToXY_O1.pkl','r'))
-experiment['axons_settings']  = [AxoGidToXY]
-if 'SSA' not in BasePath: raise Exception('not setted for FRA yet!')
-BasePath = BasePath.replace('SSA','Mosaic/SSA')
-# End
-####
-'''
-
-
-experiment['spontaneous_firing_rate_value'] = 1.5
-#reports['soma_voltage'] = {'REPORT_TARGET':'mc2_Column','START_TIME':str(0), 'END_TIME':str(9e9),'DT':str(0.1)}
-#BasePath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/AudInput23_09_18/SSA_with_spon/'
-
-if experiment['spontaneous_firing_rate_value'] !=0:
-    print('Spon FR... Look!')
 
 
 
 
 
+
+pref_boundary_vals = [[4000, 16000]]
 center_frequencies = [(6666, 9600)]
-experiment['center_frequencies'] = center_frequencies[0]
+experiment['center_frequencies'] = center_frequencies
 
 experiment['circuit_target'] = circuit_target
 Ca_vals = [1.23]
-k_vals = [float(4.15)]#,float(5.0)]
+k_vals = [float(4.15)]
 
 
-#center_frequencies = [(7727, 8282),(7210, 8877),(6727, 9514),(6277, 10196),(5856, 10928)]
-
-for amp in [60]:#[40,50,60,70,80]:
+for amp in [60]:#40,50,60,70,80]:
     set_exp_by_amp(amp)
-    # for x_start in [250]:
-    #     circuit_target = {'x':[x_start,9000], 'y':[-9000,9000], 'z':[-9000,9000]}
-    #     experiment['circuit_target'] = circuit_target
+    #for x_start in [50,240,260,280,300,320]:
+        #circuit_target = {'x':[x_start,600], 'y':[-9000,9000], 'z':[-9000,9000]}
+        #experiment['circuit_target'] = circuit_target
     
-    # for w_exp_loc in [0.1, 0.45, 0.65, 0.85]:
-    #     experiment['tunning_width_exp_loc'] = w_exp_loc
-
-
+        #for w_exp_loc in [0.1,0.45,0.65,0.85]:
+            #experiment['tunning_width_exp_loc'] = w_exp_loc
     for change_delay in [False]:#[False, True]:
         #Set all delays to the same value
         if change_delay == True:
@@ -377,18 +343,15 @@ for amp in [60]:#[40,50,60,70,80]:
                 SSA = 1
                 seed = 1
                 SSATypes = ['TwoStims']
-                #SSATypes = ['DeviantAlone']  
+
+                #SSATypes = ['DeviantAlone']
                 #SSATypes = ['DiverseNarrowExp']
-                #SSATypes = ['DiverseBroadExp']  # for diverse broad I should try DiverseBroadExpR and DiverseBroadExp
-                #SSATypes = ['Equal']; experiment['ssa_standard_probability'] = 0.5
+                SSATypes = ['Equal']; experiment['ssa_standard_probability'] = 0.5
                 #DisableUseDeps = [[], [('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
                 #DisableUseDeps =[[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
-                #DisableUseDeps = [[]]#,[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
-                DisableUseDeps = [[]]#,[('proj_Thalamocortical_VPM_Source', 'Mosaic'),('Excitatory','mc2_depressive_target_of_exc')]]
+                DisableUseDeps = [[]]#,[('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
+                #DisableUseDeps = [[],[('proj_Thalamocortical_VPM_Source', 'Mosaic'),('Excitatory','mc2_depressive_target_of_exc')]]
                 
-                # This is for nmda debug
-                #DisableUseDeps = [[],[('proj_Thalamocortical_VPM_Source', 'Mosaic'),('Excitatory','mc2_depressive_target_of_exc')],\
-                #        [('Excitatory', 'Inhibitory'), ('Excitatory', 'Excitatory'), ('Inhibitory', 'Excitatory'), ('Inhibitory','Inhibitory'), ('proj_Thalamocortical_VPM_Source', 'Mosaic')]]
                 
                 
                 Disable_CortoCorticals = [False]
@@ -400,10 +363,7 @@ for amp in [60]:#[40,50,60,70,80]:
                 
                 for SSAType in SSATypes:
                     if SSAType in ['TwoStims', 'TwoStimsPeriodic', 'TwoStimsPeriodicP9_29', 'DeviantAlone']:
-                        if first_time == 1:
-                            center_frequencies = [i for j in [[center_frq, center_frq[::-1]] for center_frq in center_frequencies] for i in j]
-                            #center_frequencies = [center_frequencies[0], center_frequencies[0][::-1]]
-                            first_time = 0
+                        center_frequencies = [center_frequencies[0], center_frequencies[0][::-1]]
                     for DisableUseDep in DisableUseDeps:
                         for remove_SK_E2 in remove_SK_E2s:
                             for Disable_CortoCortical in Disable_CortoCorticals:
@@ -445,7 +405,7 @@ for amp in [60]:#[40,50,60,70,80]:
                                     blue_out = crate_blueconfig(BlueConfig_file=f, CurrentDir = path_for_simulations, BS = BS, simulation_duration = simulation_duration,
                                                                                             run_name=run_name, ca=ca, k=k, Mg=Mg,circuit_target = circuit_target_name, decouple=Disable_CortoCortical, optogenetic_vars=[],
                                                                                             DisableUseDep = DisableUseDep,reports=reports,
-                                                                                            RunMode = RunMode, remove_spon_minis=remove_spon_minis, spike_replay=spike_replay, RNGMode=RNGMode, core_neuron=core_neuron, projection_path=projection_path)
+                                                                                            RunMode = RunMode, remove_spon_minis=remove_spon_minis, spike_replay=spike_replay, RNGMode=RNGMode, core_neuron=core_neuron)
                                     f = open(path_for_simulations + 'BlueConfig_' + run_name, 'w')
                                     f.write(blue_out)
                                     f.close()
@@ -458,8 +418,8 @@ for amp in [60]:#[40,50,60,70,80]:
                                     f = open(path_for_simulations + 'launchScript_bg_' + run_name +'.sh', 'w')
                                     f.write(launch_out)
                                     if record_lfp==True:
-                                        f.write("\nssh bbpv1.cscs.ch <<'ENDSSH' \n")
-                                        f.write('PATH="/gpfs/bbp.cscs.ch/home/amsalem/anaconda2bbpv1/bin:$PATH"\n')
+                                        f.write("\nssh bbpviz1.cscs.ch <<'ENDSSH' \n")
+                                        f.write('PATH="/gpfs/bbp.cscs.ch/home/amsalem/anaconda2/bin:$PATH"\n')
                                         f.write('python /gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/general_scripts/LFP_calculator.py ' + path_for_simulations + 'BlueConfig_' + run_name + "\nENDSSH")
                                         
                                     f.close()

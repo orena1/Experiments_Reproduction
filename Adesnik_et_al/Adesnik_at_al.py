@@ -26,31 +26,62 @@ var = 0.000001 # 0.000001 | 0.3 | 0.8
 
 generalConfigPath = '/gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/AudInput12_4_16/SSA/Ca1p23/EE0_EI0_IE0_II0_TM_0/Freq_Tono_4to16_FR_S100_W_S0p2_TwoStimsExp/BlueConfig6666_106686'
 
-bbpviz1 = True
+#bbpviz1 = True
 
-if bbpviz1 == False:
-## for bbpbg1
-    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib/hoclib'
-    init_name = 'init.hoc'
-    special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib/powerpc64/special'
-    nodes = 512
-    ntask_per_node = 32
-    partition = 'prod'
-    bbpviz_txt= ''
-    ssh_path = 'bbpbg2.cscs.ch'
-else:
-## for bbpviz1
-    hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/hoclib'
-    init_name = 'init.hoc'
-    special_path = '--mpi=pmi2 /gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/x86_64/special -mpi'
-    nodes = 16
-    ntask_per_node = 36
-    partition = 'prod'
-    bbpviz_txt = 'module load nix/hdf5/1.10.1 intel-parallel-studio/cluster.2018.1\n'\
-                     'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/bbpviz1NeuRep/reportinglib/install/lib64\n\n'
-    ssh_path = 'bbpv1.epfl.ch'
+#if bbpviz1 == False:
+### for bbpbg1
+    #hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib/hoclib'
+    #init_name = 'init.hoc'
+    #special_path = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_07_17/neurodamus/lib/powerpc64/special'
+    #nodes = 512
+    #ntask_per_node = 32
+    #partition = 'prod'
+    #bbpviz_txt= ''
+    #ssh_path = 'bbpbg2.cscs.ch'
+#else:
+### for bbpviz1
+    #hoc_lib = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/hoclib'
+    #init_name = 'init.hoc'
+    #special_path = '--mpi=pmi2 /gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/neurodamus/lib/x86_64/special -mpi'
+    #nodes = 16
+    #ntask_per_node = 36
+    #partition = 'prod'
+    #bbpviz_txt = 'module load nix/hdf5/1.10.1 intel-parallel-studio/cluster.2018.1\n'\
+                     #'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/bbp.cscs.ch/project/proj2/Programs/Master07_04_18/bbpviz1NeuRep/reportinglib/install/lib64\n\n'
+    #ssh_path = 'bbpv1.epfl.ch'
 
+
+
+change_gamma = True
+core_neuron = True
+knl = False
+cluster = 'neuron_coreneuron' # bbpv1 # bbpviz1 # bbpv1core_neuron
+
+if cluster == 'neuron_coreneuron':
+    base_dir = '/gpfs/bbp.cscs.ch/project/proj2/Programs/Master_Core_28_12_18/soft'  # 'Master_Core_22_9_18' # use this Master_Core_28_12_18 to record voltage
+    partition = 'prod'
+    if change_gamma:
+        base_dir = base_dir.replace('soft', 'soft_gamma')
+    if knl == True:
+        partition = 'prod_knl'
+        base_dir = base_dir.replace('soft_gamma','soft_gamma_knl')
+        if change_gamma==False: 
+            base_dir = sbase_dir.replace('soft','soft_knl')
+    hoc_lib = base_dir + '/sources/neurodamus/lib/hoclib'
+    init_name = 'init.hoc'
+    special_path = ''' special -mpi '''
     
+    bbpviz_txt =  'module load hpe-mpi nix/cmake\n\n'\
+                  'export BASE_DIR=' + base_dir + '\n'\
+                  'export LD_LIBRARY_PATH=$BASE_DIR/install/lib64:$BASE_DIR/install/lib:$LD_LIBRARY_PATH\n'\
+                  'export PATH=$BASE_DIR/sources/neurodamus/lib/x86_64:$PATH\n'
+    ssh_path = 'bbpv1.epfl.ch'
+    if knl == True:
+        nodes = 55
+        ntask_per_node = 64
+    else:
+        nodes = 16
+        ntask_per_node = 36
     
 
 
@@ -126,7 +157,7 @@ groups = '' if  groups == False else '_groups'
 
 #groups = 'loc_based'
 groups = 'L23_PC@0.23'
-run = '1_full_comp_gjs0p5'
+run = '1_full_comp'
 
 
 high_gamma = True # True|False
@@ -135,11 +166,18 @@ if high_gamma==True:
     run += '_high_gamma'
 
 
-path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Adesnik_Nature_2010/5_08_2018/Ca' + \
+# Set Gap Junctions
+gap_junction_conductance = 0# 0 | 0.2 |0.5
+gj_paths = {0.2:'/gpfs/bbp.cscs.ch/project/proj2/circuits/SomatosensoryCxS1-v5.r0/O1/0p0um/ncsStructural_gjdevel_withsoma2/pathways/Cond0_2/AlltoAll' ,
+            0.5: '/gpfs/bbp.cscs.ch/project/proj2/circuits/SomatosensoryCxS1-v5.r0/O1/0p0um/ncsStructural_gjdevel_withsoma2/pathways/Cond0_5/AlltoAll'}
+gap_junction_path = None
+if gap_junction_conductance!=0:
+    gap_junction_path = gj_paths[gap_junction_conductance]
+    run += '_gj' + str(gap_junction_conductance).replace('.','p')
+    
+
+path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Adesnik_Nature_2010/27_04_2019/Ca' + \
                             str(ca).replace('.','p') + '_K' + str(k).replace('.','p') +'/Run_' +str(run)  +  '/Remove_Minis_' +str(remove_spon_minis) +'/var_' + str(var).replace('.','p').replace('-','_')+'/'
-
-
-
 
 
 reports = {'soma_voltage':{
@@ -156,7 +194,7 @@ if record_lfp:
 
 circuit_target = "mc2_Column"
 
-simulation_time = "24:00:00"
+simulation_time = "14:00:00"
 nice_level = 1000
 
 opto_gen_stimstart = 2000
@@ -231,7 +269,10 @@ if '@' in groups:
 ###
 
 
-amplitudes_start_nd_end = np.array([[0,50], [0,100], [0,200], [0,400], [0,800]])
+#amplitudes_start_nd_end = np.array([[0,50], [0,100], [0,200], [0,400], [0,800], [0,1600], [0,3200]])
+
+amplitudes_start_nd_end = np.array([[50,50], [100,100], [200,200], [400,400], [800,800], [1600,1600], [3200,3200]])
+
 amplitudes_start_nd_end = amplitudes_start_nd_end.astype('float')
 for seed in seeds:
     for amp_start, amp_end in amplitudes_start_nd_end:
@@ -257,7 +298,7 @@ for seed in seeds:
         f = open(path_for_simulations +'/BlueConfig_template','r')
         blue_out = crate_blueconfig(BlueConfig_file=f, CurrentDir = path_for_simulations, BS = BS, simulation_duration = simulation_duration,
                                                                 run_name=run_name, ca=ca, k=k, Mg=Mg,circuit_target = circuit_target, optogenetic_vars=['ramp_current_injections', morphs, stim_vars],reports=reports,
-                                                                RunMode = RunMode, remove_spon_minis=remove_spon_minis)
+                                                                RunMode = RunMode, remove_spon_minis=remove_spon_minis, gap_junction_path=gap_junction_path)
         f = open(path_for_simulations + 'BlueConfig_' + run_name, 'w')
         f.write(blue_out)
         f.close()
@@ -270,15 +311,15 @@ for seed in seeds:
         f = open(path_for_simulations + 'launchScript_bg_' + run_name +'.sh', 'w')
         f.write(launch_out)
         if record_lfp==True:
-            f.write("\nssh bbpviz1.bbp.epfl.ch <<'ENDSSH' \n")
-            f.write('PATH="/gpfs/bbp.cscs.ch/home/amsalem/anaconda2/bin:$PATH"\n')
+            f.write("\nssh bbpv1.epfl.ch <<'ENDSSH' \n")
+            f.write('PATH="/gpfs/bbp.cscs.ch/home/amsalem/anaconda2bbpv1/bin:$PATH"\n')
             f.write('python /gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/general_scripts/LFP_calculator.py ' + path_for_simulations + 'BlueConfig_' + run_name + "\nENDSSH")
-            
+                
         f.close()
         if not os.path.exists(path_for_simulations + '/' + run_name): #If folder already exist do not send it.
             run_names.append('sbatch launchScript_bg_' + run_name +'.sh')
 
-#submit_jobs(run_names, path_for_simulations, MaxJobs = 1,  all_after_one=True, ssh_path=ssh_path)
+submit_jobs(run_names, path_for_simulations, MaxJobs = 4,  all_after_one=False, ssh_path=ssh_path)
                     
                 
 

@@ -5,21 +5,82 @@ import shutil
 from HelpFuncs import SetCaKThresh, SetCaK, SetFacDep
 from Cheetah.Template import Template
 import subprocess
+import bluepy
+from bluepy.v2 import Cell
 
 
+def set_circuit_target_by_axes_limit(blue_config_circ, path_for_simulations, target_settings, base_target ='mc2_Column'):
+    if target_settings in ['mc2_Column','O1_slice_mc2', 'a10020', 'a10020_cell', 'Mosaic']:
+        return(target_settings)
+    if 'Slice' in target_settings:
+        return(target_settings)
+    if base_target == 'mc2_Column': #need to change this eventually
+        target_name ='mc2_X' + `target_settings['x'][0]`.replace('-','m') + 'to'+ `target_settings['x'][1]`.replace('-','m') +\
+                        '_Y' + `target_settings['y'][0]`.replace('-','m') + 'to'+ `target_settings['y'][1]`.replace('-','m') +\
+                        '_Z' + `target_settings['z'][0]`.replace('-','m') + 'to'+ `target_settings['z'][1]`.replace('-','m')
 
+    else:
+        target_name = base_target +  '_X' + `target_settings['x'][0]`.replace('-','m') + 'to'+ `target_settings['x'][1]`.replace('-','m') +\
+                        '_Y' + `target_settings['y'][0]`.replace('-','m') + 'to'+ `target_settings['y'][1]`.replace('-','m') +\
+                        '_Z' + `target_settings['z'][0]`.replace('-','m') + 'to'+ `target_settings['z'][1]`.replace('-','m')
+    
+    gids_in_group = []
+    circ = blue_config_circ
+    gid_to_loc = {}
+    mc2_gids = circ.v2.cells.ids(base_target)
+    gid_to_x =circ.v2.cells.get(mc2_gids,properties=[Cell.X]).to_dict().values()[0]
+    gid_to_y =circ.v2.cells.get(mc2_gids,properties=[Cell.Y]).to_dict().values()[0]
+    gid_to_z =circ.v2.cells.get(mc2_gids,properties=[Cell.Z]).to_dict().values()[0]
+    for gid in gid_to_x:
+        if target_settings['x'][0]<gid_to_x[gid]<target_settings['x'][1] and target_settings['y'][0]<gid_to_y[gid]<target_settings['y'][1] and target_settings['z'][0]<gid_to_z[gid]<target_settings['z'][1]:
+            gids_in_group.append(gid)
+
+    f = open(path_for_simulations+ '/user.target', 'r')
+    txt = f.read()
+    if target_name in txt: 
+        print(target_name +' already exist')
+        return(target_name)
+    txt+= '\n'
+    txt+= 'Target Cell ' + target_name + '\n{\n '
+    for gid in sorted(gids_in_group): txt+='a' + str(gid) + ' '
+    txt+='\n}\n'
+    f.close()
+
+    f = open(path_for_simulations + '/user.target', 'w')
+    #import pdb; pdb.set_trace()
+    f.write(txt)
+    f.close()
+
+    return(target_name)
+
+
+def test_competability(BlueConfig_file, CurrentDir, BS, simulation_duration, run_name, ca, k, Mg,
+                    circuit_target='mc2_Column', decouple=False, optogenetic_vars = [], RunMode = 'RunMode LoadBalance', DisableUseDep = [], reports={}, remove_spon_minis=False,
+                    spike_replay=None, other_circuit=False, v_clamp = {}, RNGMode = 'Compatibility', gap_junction_path=None, save_state_part=None, core_neuron = None, projection_path=None):
+    if RNGMode == 'Compatibility' and core_neuron==True:
+        raise Exception('will not work!')
+    if 'LFP' in reports  and core_neuron==True:
+        raise Exception('not sure it is implemented yet')
 
 def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_name, ca, k, Mg,
                     circuit_target='mc2_Column', decouple=False, optogenetic_vars = [], RunMode = 'RunMode LoadBalance', DisableUseDep = [], reports={}, remove_spon_minis=False,
-                    spike_replay=None, other_circuit=False, v_clamp = {}, RNGMode = 'Compatibility', gap_junction_path=None):
+                    spike_replay=None, other_circuit=False, v_clamp = {}, RNGMode = 'Compatibility', gap_junction_path=None, save_state_part=None, core_neuron = None,
+                    projection_path = '/gpfs/bbp.cscs.ch/project/proj1/circuits/SomatosensoryCxS1-v5.r0/O1/merged_circuit/ncsThalamocortical_VPM_tcS2F_2p6_ps',
+                    MEComboInfoFile = None):
 
     '''
+    
     v_clamp example - v_clamp[voltage][target] -- v_clamp[-80][L2_PC,L5_PC]
     RNGMode = Compatibility, UpdatedMCell, or Random123
+    
     '''
-
+    test_competability(BlueConfig_file, CurrentDir, BS, simulation_duration, run_name, ca, k, Mg,
+                    circuit_target=circuit_target, decouple=False, optogenetic_vars =optogenetic_vars, RunMode = RunMode, DisableUseDep = DisableUseDep, reports=reports, remove_spon_minis=remove_spon_minis,
+                    spike_replay=spike_replay, other_circuit=other_circuit, v_clamp = {}, RNGMode = RNGMode, gap_junction_path=gap_junction_path, save_state_part=save_state_part, core_neuron = core_neuron,
+                    projection_path = projection_path)
     newF = ''
     RunBlock = 1 #I assume the RunBlock is in the start
+    delete_num_synapses = 0
     for line in BlueConfig_file:
         if 'CurrentDir' in line:
             newF += '      CurrentDir ' + CurrentDir+'\n'
@@ -27,15 +88,25 @@ def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_n
             newF += '      OutputRoot ' + CurrentDir + '/' + run_name + '\n'
         elif 'TargetFile' in line:
             newF += '      TargetFile ' + CurrentDir + '/user.target\n'
+        elif 'MEComboInfoFile' in line and MEComboInfoFile !=None:
+            newF += '        MEComboInfoFile ' + MEComboInfoFile +'\n'
         elif 'BaseSeed' in line:
             newF += '        BaseSeed ' + `BS` + '\n'
             newF += '        RNGMode '  + RNGMode + '\n'
+            if core_neuron:
+                newF += '        Simulator CORENEURON \n'
             if 'LFP' in reports:
                 newF += '        ElectrodesPath /gpfs/bbp.cscs.ch/project/proj1/circuits/SomatosensoryCxS1-v5.r0/O1/merged_circuit\n'
         elif '#RunMode' in line:
             newF += '        ' + RunMode + '\n'
         elif 'CircuitTarget' in line:
             newF +='  CircuitTarget ' + circuit_target +'\n'
+        elif 'ncsThalamocortical_VPM_tcS2F_2p6_ps' in line:
+            newF +=' Path ' + projection_path + '\n'
+            if projection_path !='/gpfs/bbp.cscs.ch/project/proj1/circuits/SomatosensoryCxS1-v5.r0/O1/merged_circuit/ncsThalamocortical_VPM_tcS2F_2p6_ps':
+                delete_num_synapses = 1
+        elif 'NumSynapseFiles' in line and delete_num_synapses: # delete the numofsynapses in case we change the pojection
+            pass
         elif 'SpikeFile' in line:
             if spike_replay==None:
                 newF += '        SpikeFile ' + CurrentDir + '/inputs.dat\n'
@@ -43,6 +114,9 @@ def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_n
                 newF += '        SpikeFile ' + spike_replay + '\n'
         elif 'Duration' in line and RunBlock:
             newF += '         Duration ' + `simulation_duration`+'\n'
+            if save_state_part!=None:
+                newF +='   Save checkpoints\\' + run_name + '\\' + save_state_part  
+            
         elif 'Reports' in line:
             if gap_junction_path!=None:
                 newF += GapJunctionTxt.replace('GJ_PATH',gap_junction_path)
@@ -52,6 +126,9 @@ def crate_blueconfig(BlueConfig_file, CurrentDir, BS, simulation_duration, run_n
                     newF += Voltage_Report.replace('REPORT_TARGET',reports['soma_voltage']['REPORT_TARGET']).replace('START_TIME',reports['soma_voltage']['START_TIME']).replace('END_TIME',reports['soma_voltage']['END_TIME'])
                 if report_type=='LFP':
                     newF += LFP_Report.replace('START_TIME',reports['LFP']['START_TIME']).replace('END_TIME',reports['LFP']['END_TIME']).replace('DT',reports['LFP']['DT'])
+                if report_type == 'use':
+                    newF += Use_Report.replace('REPORT_TARGET',reports['use']['REPORT_TARGET']).replace('START_TIME',reports['use']['START_TIME']).replace('END_TIME',reports['use']['END_TIME']).replace('DT',reports['use']['DT'])
+                    
             if v_clamp != {}:
                 print(v_clamp)
                 for v in v_clamp:
@@ -105,18 +182,21 @@ def create_launch_script(launchScript_file, hoc_lib, init_name, special_path, si
                 newF +='#SBATCH --ntasks-per-node=' +str(ntask_per_node) +'\n'
                 newF +='#SBATCH --nodes=' +str(nodes) +'\n'
                 newF +='#SBATCH --exclusive \n'
-                if ntask_per_node==64:
+                if ntask_per_node in [64,128]:
                     newF +='#SBATCH -C knl\n'
+                    newF +='#SBATCH --mem=0\n'
+                    if core_neuron ==False:
+                        print('***  Trying to use knl without coreneuron!***')
                 else:
                     newF +='#SBATCH -C nvme|cpu\n'
-                #newF +='#SBATCH -n ' + str(ntask_per_node*nodes) +'\n'
-                #newF +='#SBATCH --cpus-per-task=1\n'
-                if nodes>16:
-                    newF +='#SBATCH --qos=bigjob\n'
-                if int(simulation_time[:2])>24:
-                    newF +='#SBATCH --qos=longjob\n'
-                if int(simulation_time[:2])>24 and nodes>16:
-                    raise Exception('Will not work, no qos for it!')
+                    #newF +='#SBATCH -n ' + str(ntask_per_node*nodes) +'\n'
+                    #newF +='#SBATCH --cpus-per-task=1\n'
+                    if nodes>16:
+                        newF +='#SBATCH --qos=bigjob\n'
+                    if int(simulation_time[:2])>24:
+                        newF +='#SBATCH --qos=longjob\n'
+                    if int(simulation_time[:2])>24 and nodes>16:
+                        raise Exception('Will not work, no qos for it!')
         elif "#SBATCH --time=" in line:
             newF += "#SBATCH --time=" + simulation_time + '\n'
         elif "#SBATCH --partition=" in line:
@@ -133,11 +213,11 @@ def create_launch_script(launchScript_file, hoc_lib, init_name, special_path, si
         elif 'export HOC_LIB' in line:
             newF += 'export HOC_LIBRARY_PATH=' + hoc_lib + '\n' + bbpviz_txt
         elif 'srun' in line:
+            newF +='srun -N $SLURM_NNODES -n $SLURM_NNODES --ntasks-per-node=1 numactl -H | grep free\n'
             #if bbpviz_txt!='':#X fix
             #    newF +=  'srun -n $SLURM_JOB_NUM_NODES --ntasks-per-node=1  sudo /usr/local/bin/restartX.sh \n'
             newF += line.replace('BlueConfig','BlueConfig_' + run_name).replace('init.hoc',init_name).replace('binPath',special_path) + '\n'
             if core_neuron==True:
-                newF += 'srun --mpi=pmi2 $CORENEURON_EXE -mpi --read-config ' + run_name +'/sim.conf\n'
                 newF += 'sleep 15\n'
                 newF += 'rm -fr ' + run_name + '/coreneuron_input \n'
         else:
@@ -175,15 +255,15 @@ def submit_jobs(run_names, paths_for_simulations, MaxJobs, all_after_one=False, 
     BaseDir = os.getcwd()
     if type(paths_for_simulations) !=list:
         paths_for_simulations = [paths_for_simulations]*len(run_names)
-    if os.path.exists('mcomplex.dat')==False and all_after_one==False and force_all_after_one==False:
-        raise Exception("Not multisplit data and all_after_one is set to False")
+
     
     NumOfJobs = 0
     lastDep = 0
     JobsList = []
     for l,path_for_simulations in zip(run_names,paths_for_simulations):
         os.chdir(path_for_simulations)
-
+        if os.path.exists('mcomplex.dat')==False and all_after_one==False and force_all_after_one==False:
+            raise Exception("Not multisplit data and all_after_one is set to False")
         if NumOfJobs<MaxJobs:
             if all_after_one==True and NumOfJobs>0:
                 SendTxt = l.split(' ')[0] + ' --dependency=afterany:' + JobsList[0] + ' ' +l.split(' ')[1]
@@ -228,6 +308,18 @@ Voltage_Report = 'Report soma\n'\
 '       EndTime END_TIME\n'\
 '}\n\n'
 
+
+Use_Report  = '''Report ProbAMPANMDA_EMS_Use
+                {
+                    Target REPORT_TARGET
+                    Type Synapse
+                ReportOn ProbAMPANMDA_EMS.u
+                    Unit nd
+                    Format Bin
+                        Dt DT
+                StartTime START_TIME
+                EndTime END_TIME
+                }'''
 
 
 LFP_Report = 'Report AllCompartmentsMembrane\n'\

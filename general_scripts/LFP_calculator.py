@@ -44,11 +44,11 @@ def build_sbatch_script(points, file_name, number_of_files):
         point_txt += ' --sample-point ' + ','.join(map(str,point))
         
                                                                                                                                                         #There is a bug when it breaks at 29 ms before the end
-    ptxt = '/gpfs/bbp.cscs.ch/home/chevtche/EMSimNew/Release/bin/emsim -i ' + BlueConfig + ' ' + command + ' --start-time 0 --end-time ' + str(int(simulation_time)-50) + ' -o ' + out_dir +'/' + file_name + ' '   + point_txt
+    ptxt = 'emsim -i ' + BlueConfig + ' ' + command + ' --start-time 0 --end-time ' + str(int(simulation_time)-50) + ' -o ' + out_dir +'/' + file_name + ' '   + point_txt
     values['ptxt'] = ptxt
     
     values['job_name'] = out_file + file_name
-    values['job_time'] = '48:00:00'
+    values['job_time'] = '24:00:00'
     values['queue'] = 'prod'
     values['account'] = 'proj2'
     values['nodes'] = 1
@@ -68,11 +68,10 @@ def build_sbatch_script(points, file_name, number_of_files):
         '#SBATCH --output="{output_dir}/{job_name}_out.txt"',
         '#SBATCH --error="{output_dir}/{job_name}_err.txt"',
         '#SBATCH --exclusive',
-        'cd {output_dir}',
+        '#SBATCH -C nvme|cpu',
+	'cd {output_dir}',
         'sleep 5',
-        'module load BBP/viz/latest',
-        'sleep 5',
-        'module load BBP/viz/latest',
+        'module load nix/viz/emsim/latest',
         '',
         '{ptxt}',
         'PATH="/gpfs/bbp.cscs.ch/home/amsalem/anaconda2/bin:$PATH"\n',

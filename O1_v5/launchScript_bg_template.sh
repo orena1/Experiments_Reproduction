@@ -62,7 +62,6 @@ echo
 
 export HOC_LIBRARY_PATH=/gpfs/bbp.cscs.ch/project/proj2/Programs/SaveStateNeuron/bgq/neurodamus/lib/hoclib
 
-
 # default runs with max mpi process = ntasks
 srun binPath -c "{strdef configFile configFile=\"BlueConfig\"}" -NFRAME 256 $HOC_LIBRARY_PATH/init.hoc
 

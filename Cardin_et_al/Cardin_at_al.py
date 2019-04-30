@@ -144,6 +144,23 @@ if gap_junction_conductance!=0:
     run += '_gj' + str(gap_junction_conductance).replace('.','p')
 ###################    
 
+def create_thalamic_spikes(fr_per_axon, stim_start_time, stim_end_time, seed):
+    interv = 1.0/fr_per_axon*1000
+    thalamic_rnd = random.RandomState(seed)
+    sp_per_axon_gid = {}
+    for axon_gid in ?:
+        to_add = [stim_start_time]
+        while 1:
+            rnd = -math.log(1.0 - thalamic_rnd.uniform(0,1)) / (1.0/interv)
+            if rnd + to_add[-1] > stim_end_time:
+                break
+            else:
+                to_add.append(rnd + to_add[-1])
+        sp_per_axon_gid[axon_gid] = to_add[1:]
+    return(sp_per_axon_gid)
+
+create_thalamic_spikes(10, 1000, 2500, ?? )
+
 path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_Experiments/Cardin_Nature_2009/23_07_2018/Ca' + \
                             str(ca).replace('.','p') + '_K' + str(k).replace('.','p') +'/Run_' +str(run)  +  '/Remove_Minis_' +str(remove_spon_minis) +'/var_' + str(var).replace('.','p').replace('-','_')+'/'
 

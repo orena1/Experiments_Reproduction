@@ -57,8 +57,8 @@ if completed_files == number_of_files: # all runs finished the LFP calculation.
     pickle.dump(xyz_to_lfp,open(path +'/emsim_LFP.p','w'))
     
     print("delete AllCompartmentsMembrane deleting files")
-    #os.remove("AllCompartmentsMembrane.bbp")
-    print("finish AllCompartmentsMembrane deleting files")
+    os.remove("AllCompartmentsMembrane.bbp")
+    print("finish AllCompartmentsMembrane deleting files, should delete the AllCompartmentsMembrane")
 else:
     print('Completed jobs {} and number of files {}, not equal, doing nothing'.format(completed_files, number_of_files))
     
