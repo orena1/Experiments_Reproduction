@@ -1,0 +1,22 @@
+#!/usr/bin/perl
+use Text::ParseWords;
+$DirName = "/bglscratch/bbp/rajnish/sim07/jun/15jun07";
+if(@ARGV > 0){
+	for ($i=0; $i<@ARGV; $i++)
+	{
+		$ret1 = `md5sum $ARGV[$i]`;
+		#print "Printing ret1 = [$ret1]\n";
+		@lst  = &shellwords($ret1);
+		#print "printing... @lst done\n";
+		$ret1 = @lst[0];
+		$ret2 = `md5sum $DirName/$ARGV[$i]`;
+		@lst  = &shellwords($ret2);
+		$ret2 = @lst[0];
+		if($ret1 != $ret2){
+		print "Comparing [$ARGV[$i]].....\n";
+			print "\t$ret1\n\t$ret2\n";
+		}
+	}
+	
+#md5sum $1 /bglscratch/bbp/rajnish/sim07/jun/7jun07/$1
+}

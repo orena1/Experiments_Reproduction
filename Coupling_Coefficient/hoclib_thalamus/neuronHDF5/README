@@ -1,0 +1,33 @@
+README: Using Neuron to parse NL and have it write an HDF5 file
+
+What you need:
+
+install hdf5-1.6.5.tar.gz:
+
+tar xzvf hdf5-1.6.5.tar.gz
+cd into that directory
+./configure --prefix=/home/you/hdf5
+make
+make check
+make install
+
+
+
+In order to have the hdf5-file generated you need Neuron. If
+you execute nrngui in the current directory, everything runs
+smoothly. If you want to generate a special, you need to patch
+nrnivmodl, nrnmech_makefile to include the -L/home/you/hdf5/lib 
+-lhdf5.
+
+For batch processing, I need to add a little script that fills
+to_check.tmp from validateASC.
+
+
+After running nrngui mk_hdf5.hoc you will find the appropirate
+.h5 files in the directory.
+
+
+main.cpp/Makefile are a little C/C++ test program to demonstrate
+the readin.
+
+IMPORTANT: Don't forget to export LD_LIBRARY_PATH=/home/you/hdf5/lib

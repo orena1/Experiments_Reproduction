@@ -1,0 +1,47 @@
+/**
+ * @file BasicCellList.hoc
+ * @brief 
+ * @author moor
+ * @date 2010-04-28
+ * @remark Copyright © BBP/EPFL 2005-2011; All rights reserved. Do not distribute without further notice.
+ */
+
+begintemplate basicCellList
+
+objref cellList
+public init, getCell, registerCell
+
+proc init() {
+    cellList = new List()
+}
+
+/*
+ * Append cell to list
+ *
+ * @param $o1 Reference to a cell object the user has created
+ */
+proc registerCell() {
+    cellList.append($o1)
+}
+
+/*!
+ * Cell registered with the function registerCell can be obtained by gid
+ *
+ * @param $1 gid
+ */
+obfunc getCell() {
+    if( object_id(cellList) == 0 ) {
+        print "getCell: No cell in list."
+    }
+    
+    for listindex=0, cellList.count()-1 {
+        if( cellList.object(listindex).gid == $1 ) {
+            return cellList.object(listindex)
+        }
+    }
+    // not found
+    print "getCell: cell not in list."
+}
+
+
+endtemplate basicCellList

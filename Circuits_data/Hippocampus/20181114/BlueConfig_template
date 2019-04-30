@@ -1,0 +1,60 @@
+Run Default
+{
+	Date    14:2:13
+	Time    11:32:35
+    svnPath https://bbpteam.epfl.ch/svn/bluebrain
+	Version    1094 
+
+    MorphologyPath /gpfs/bbp.cscs.ch/project/proj42/entities/morphologies/20180417/
+    METypePath /gpfs/bbp.cscs.ch/project/proj42/entities/emodels/20180504b/hoc
+    MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj42/entities/emodels/20180504b/mecombo_emodel.tsv
+    CellLibraryFile circuit.mvd3
+    CircuitPath /gpfs/bbp.cscs.ch/project/proj42/circuits/O1/20181114/
+    nrnPath /gpfs/bbp.cscs.ch/project/proj42/circuits/O1/20181114/connectome/functional/merged/
+    CurrentDir /gpfs/bbp.cscs.ch/project/proj42/simulations/O1.20181114/20181213/
+    OutputRoot /gpfs/bbp.cscs.ch/project/proj42/simulations/O1.20181114/20181213/
+    TargetFile /gpfs/bbp.cscs.ch/project/proj42/circuits/O1/20181114/user.target
+
+    NumSynapseFiles 2048
+    RNGMode Random123
+    BaseSeed 10
+    # RunMode LoadBalance
+    CircuitTarget Mosaic
+    Duration 5000
+    Dt 0.025
+    ForwardSkip 5000
+}
+
+
+
+Projection gapjunction
+{
+    # can use absolute path
+    # Path gap_junctions
+    Path /gpfs/bbp.cscs.ch/project/proj2/circuits/create_GJs_cons/hippocampus/20181114/gap-junctions_0um/
+
+    Type GapJunction
+    Source Non
+}
+
+
+
+
+Reports
+
+Stimulus hypamp
+{
+        Mode Current
+  Pattern Hyperpolarizing
+        Delay 0.0
+  Duration 10000000.0
+}
+
+StimulusInject hypamp_mosaic
+{
+        Stimulus hypamp
+        Target Mosaic
+}
+
+OptStim
+

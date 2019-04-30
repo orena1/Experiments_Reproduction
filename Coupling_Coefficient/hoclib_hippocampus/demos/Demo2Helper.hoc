@@ -1,0 +1,84 @@
+/**
+ * @file Demo2Helper.hoc
+ * @brief Encapsulate any hoc actions that are necessary to instantiate this synapse type
+ * @author king
+ * @date 2015-04-16
+ * @remark Copyright © BBP/EPFL 2005-2015; All rights reserved. Do not distribute without further notice.
+ */
+
+// global that is shared/accessible from Demo2Helper objects
+// Note that a name should be chosen that should not be used for any other global.  Otherwise may cause strange behavior
+objref synapseReaderDemo2Helper
+
+/**
+ * Example Helper object to illustrate a more complex override to synapse type
+ */
+begintemplate Demo2Helper
+
+objref synapse, rng
+public synapse
+
+external synapseReaderDemo2Helper
+
+/**
+ * @param tgid gid of Postsynaptic cell
+ * @param synParameters set of paramters loaded from default nrn.h5
+ * @param x location of the synapse along the section (0<=x<=1)
+ * @param synapseID id assigned to this synapses within the cell's context
+ * @param baseSeed for random number generator
+ * @param synOverride Map of field/value pairs of Connection block taken from ConfigParser
+ */
+proc init() { local tgid, x, synapseID, baseSeed, nfiles, altU, res  localobj synParams, fname, synOverride
+    strdef datasetName
+
+    tgid = $1
+    synParams = $o2
+    x = $3
+    synapseID = $4
+    baseSeed = $5
+    synOverride = $o6
+
+    synapse = new ProbGABAAB_EMS(x)
+
+    if( object_id( synapseReaderDemo2Helper, 1 ) == -1 ) {
+        //fname = new String("/gpfs/bbp.cscs.ch/release/l2/data/circuit/23.07.12/SomatosensoryCxS1-v4.lowerCellDensity.r151/O1/merged_circuit/ncsFunctionalAllRecipePathways/nrn.h5")
+        // This field can be named whatever the user wants.  Needs to just use 'get' method
+        fname = synOverride.get( "OtherSynPath" )
+        print "access more info at ", fname.s
+
+        // This requires there be a single HDF5 file.  If multiple files are to be supported, we need to change code structure
+        synapseReaderDemo2Helper = new HDF5Reader( fname.s )
+    }
+
+    // Note that HDF5readers remember the last data set loaded.  As long as the same gid is requested, it will not go back to the disk
+    {sprint( datasetName, "a%d", tgid )}
+    res = synapseReaderDemo2Helper.loadData( datasetName )
+    if( res < 0 ) {
+        print "Error loading data for gid ", datasetName
+        return
+    }
+
+    // TODO: how do we make finding the appropriate row fast/easy?
+    //synapseReaderDemo2Helper.numberofrows
+
+    // for this example, synapseID corresponds to the row
+    altU = synapseReaderDemo2Helper.getData( datasetName, synapseID, 9 )
+
+    rng = new Random()
+    {rng.MCellRan4( synapseID*100000+100, tgid+250+baseSeed )}
+    {rng.lognormal(0.2, 0.1)}
+    synapse.tau_r_GABAA = rng.repick()
+    synapse.tau_d_GABAA = synParams.DTC
+
+    synapse.Use = abs( synParams.U )
+    synapse.Dep = abs( synParams.D )
+    synapse.Fac = abs( synParams.F )
+
+    rng = new Random()
+    {rng.MCellRan4( synapseID*100000+100, tgid+250+baseSeed )}
+    {rng.uniform(0,1)}
+    {synapse.setRNG( rng )}
+    synapse.synapseID = synapseID
+}
+
+endtemplate Demo2Helper

@@ -1,0 +1,374 @@
+Run Default
+{
+   MorphologyPath /gpfs/bbp.cscs.ch/project/proj55/oreilly/releases/2018-04-19/morph_release/
+   METypePath   /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/modelmanagement/2018-06-07/output/emodels_hoc_fix/
+   MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/modelmanagement/2018-06-07_isearch/output_megate/mecombo_emodel.tsv
+
+      CircuitPath /gpfs/bbp.cscs.ch/project/proj55/oreilly/releases/2018-04-19
+          nrnPath /gpfs/bbp.cscs.ch/project/proj55/oreilly/releases/2018-04-19/connectome/functional
+  CellLibraryFile circuit.mvd3
+
+        BaseSeed 360819
+
+	CurrentDir /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2018-10-24/depolarizations/depolarization200p0/Ca2p0/targetRt_RC/seed360819
+      OutputRoot /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2018-10-24/depolarizations/depolarization200p0/Ca2p0/targetRt_RC/seed360819
+      #TargetFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2018-10-24/depolarizations/depolarization200p0/Ca2p0/targetRt_RC/seed360819/user.target
+
+
+      	RunMode LoadBalance
+    CircuitTarget Mosaic
+         Duration 7000
+               Dt 0.025
+	 ForwardSkip 5000
+}
+
+Report soma
+{
+    Target All
+    Type compartment
+    ReportOn v
+    Unit mV
+    Format Bin
+    Dt 0.1
+    StartTime 0
+    EndTime 7000
+}
+
+Stimulus ThresholdDepol
+{
+
+              Mode Current
+           Pattern Noise
+       MeanPercent 200.0
+          Variance 0.001
+             Delay 2000.0
+          Duration 2500.0
+}
+
+
+StimulusInject ThresholdDepolInj
+{
+        Stimulus ThresholdDepol
+        Target Rt_RC
+}
+
+# TODO: Add depolarization ramp once BBPBGLIB-420 has been addressed.
+
+Stimulus hypamp
+{
+        Mode Current
+  Pattern Hyperpolarizing
+        Delay 0.0
+  Duration 7000
+}
+
+StimulusInject hypamp_mosaic
+{
+        Stimulus hypamp
+        Target Mosaic
+}
+
+#Report I_Ca
+{
+        Target AllCompartments_mc2
+          Type Summation
+      ReportOn ica
+          Unit nA
+        Format Bin
+            Dt 0.1
+     StartTime 0
+       EndTime 2000
+}
+
+#Report I_NonSpecific
+{
+        Target AllCompartments_mc2
+          Type Summation
+      ReportOn i_pas ihcn_Ih ihcn_hcn3 icsa_csa
+          Unit nA
+        Format Bin
+            Dt 0.1
+     StartTime 0
+       EndTime 2000
+}
+
+#Report I_NMDA
+{
+       Target AllCompartments_mc2
+         Type Summation
+     ReportOn ProbAMPANMDA_EMS.i_NMDA
+         Unit nA
+       Format Bin
+           Dt 0.1
+    StartTime 0
+      EndTime 2000
+}
+
+{
+       Target AllCompartments_mc2
+         Type Summation
+     ReportOn ProbAMPANMDA_EMS.i_AMPA
+         Unit nA
+       Format Bin
+           Dt 0.1
+    StartTime 0
+      EndTime 2000
+}
+
+#Report I_GABA
+{
+       Target AllCompartments_mc2
+         Type Summation
+     ReportOn ProbGABAA_EMS.i
+         Unit nA
+       Format Bin
+           Dt 0.1
+    StartTime 0
+      EndTime 2000
+}
+
+
+#Connection ConL6Exc-Uni
+{
+        Source Excitatory
+        Destination Layer6
+        Weight 1.0
+        SpontMinis 0.04
+}
+
+#Connection ConL5Exc-Uni
+{
+        Source Excitatory
+        Destination Layer5
+        Weight 1.0
+        SpontMinis 0.067
+}
+
+#Connection ConL4Exc-Uni
+{
+        Source Excitatory
+        Destination Layer4
+        Weight 1.0
+        SpontMinis 0.072
+}
+
+#Connection ConL3Exc-Uni
+{
+        Source Excitatory
+        Destination Layer3
+        Weight 1.0
+        SpontMinis 0.122
+}
+
+#Connection ConL2Exc-Uni
+{
+        Source Excitatory
+        Destination Layer2
+        Weight 1.0
+        SpontMinis 0.26
+}
+
+#Connection ConL1Exc-Uni
+{
+        Source Excitatory
+        Destination Layer1
+        Weight 1.0
+        SpontMinis 0.63
+}
+
+
+
+#Connection ConInh-Uni
+{
+        Source Inhibitory
+        Destination Mosaic
+        Weight 1.0
+	SpontMinis 0.012
+}
+
+
+# Adjust global synapse parameters, e.g. reversals
+Connection GABAB_erev
+{
+	Source Inhibitory
+	Destination Mosaic
+	Weight 1.0
+	SynapseConfigure %s.e_GABAA = -80.0 %s.e_GABAB = -75.8354310081
+}
+
+Connection MGGate
+{
+	Source Excitatory
+	Destination Mosaic
+	Weight 1.0
+	SynapseConfigure %s.mg = 1.0
+}
+
+# Use adjustments due to Calcium 2.0 mM compared to normal 2.0 mM
+#Connection scheme_CaUse_ee
+{       
+              Source Excitatory 
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+#Connection scheme_CaUse_e_2_PV_FS
+{       
+              Source Excitatory 
+         Destination PV_FS
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+#Connection scheme_CaUse_PV_FS_2_e
+{       
+              Source PV_FS
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+#Connection scheme_CaUse_e_2_DISTAR_INH
+{       
+              Source Excitatory 
+         Destination DISTAR_INH
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+#Connection scheme_CaUse_DISTAR_INH_2_e
+{       
+              Source DISTAR_INH
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+Connection scheme_CaUse_e_2_Other_Inh
+{       
+              Source Excitatory 
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+Connection scheme_CaUse_Other_Inh_2_e
+{       
+              Source Inhibitory
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+Connection scheme_CaUse_Inh_Inh
+{       
+              Source Inhibitory
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+
+# Adjust AMPA_NMDA and GABAA_B ratios
+#Connection scheme_minus2
+{       
+              Source Excitatory 
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.4
+}
+
+Connection scheme_minus1
+{       
+              Source Excitatory
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.8
+}
+
+#Connection scheme5
+{       
+              Source L5_TTPC1
+         Destination L5_TTPC1
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.71
+}
+
+#Connection scheme6
+{       
+              Source L5_TTPC2
+         Destination L5_TTPC2
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.71
+}
+
+#Connection scheme7
+{       
+              Source L5_TTPC1
+         Destination L5_TTPC2
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.71
+}
+
+#Connection scheme8
+{       
+              Source L5_TTPC2
+         Destination L5_TTPC1
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.71
+}
+
+#Connection NMDA_Override_L4-L4
+{
+        Source Layer4Excitatory
+        Destination Layer4Excitatory
+        Weight 1.0
+        SynapseConfigure %s.NMDA_ratio = 0.86
+
+}
+
+#Connection NMDA_Override_L4-L23
+{
+        Source L4_SS
+        Destination L23_PC
+        Weight 1.0
+        SynapseConfigure %s.NMDA_ratio = 0.5
+
+}
+
+Connection scheme1b
+{       
+              Source Inhibitory
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.GABAB_ratio = 0.75
+}
+
+Connection scheme2b
+{       
+              Source Inhibitory
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.GABAB_ratio = 0.75
+}
+
+#Connection schemeExternal
+{
+          Source proj_Thalamocortical_VPM_Source
+     Destination Mosaic
+SynapseConfigure %s.Use = 0.86
+          Weight 1.0
+}
+
+
+#Connection scheme_CaUse_ee_tc2c
+{
+              Source proj_Thalamocortical_VPM_Source
+         Destination Mosaic
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+
+

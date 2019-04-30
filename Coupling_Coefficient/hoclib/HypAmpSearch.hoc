@@ -1,0 +1,377 @@
+/**
+ * @file HypAmpSearch.hoc
+ * @brief Evaluate a CCell to find an appropriate current to inject which can bring a cell's voltage down to -70 mV
+ * @author king
+ * @date 2010-03-10
+ * @remark Copyright © BBP/EPFL 2005-2011; All rights reserved. Do not distribute without further notice.
+ */
+
+{load_file("nrngui.hoc")}
+{load_file("stdlib.hoc")}
+{load_file("netparmpi.hoc")}
+{load_file("timeit.hoc")}
+
+{load_file("ConfigParser.hoc")}
+{load_file("TStim.hoc")}
+{load_file("Cell.hoc")}
+
+/**
+ * Evaluate an me combintation to find an appropriate hyper polariazing amp injection to bring the
+ * membrance voltage of a cell to approx -70 mV
+ */
+begintemplate HypAmpSearch
+
+public init, exec, writeUpdatedCCell, enableDebugging, getVm, clear
+objref sourceCell, stim, this, parsedRun
+strdef meFileName
+
+external tstop, run
+
+//for debugging
+objref somaVolt, somaTime, traceFile
+
+//-----------------------------------------------------------------------------------------------
+// Member function implementations
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * @param $o1 Run data - Map containing run field/value pairs
+ * @param $s2 meFileName - name of the file containing the metype
+ * @param $s3 meTypeName - name of metype used for instantiation (may be different from file)
+ * @param $4  targetVm - the membrane voltage this cell should reach when given the hyperpolarizing stimulus
+ * @param $s5 morphologypath - name of the morphology path	 
+*/
+proc init() {
+    strdef tstr
+    
+    parsedRun = $o1
+    meFileName = $s2
+    
+    // note - filename can have special character: '-', '.', '(', ')'
+    // but the template name will have converted these to underscores: '_'
+
+    //load template
+    {sprint( tstr, "%s/%s.hoc", parsedRun.get( "METypePath" ).s, $s2 )}
+    {load_file(tstr)}
+    
+    // instantiate instance
+    //{sprint( tstr, "sourceCell = new %s(1, \"%s/ascii\")", $s3, parsedRun.get( "MorphologyPath" ).s )}
+	{sprint( tstr, "sourceCell = new %s(1, \"%s/ascii\")", $s3,$s5)}    
+	{execute( tstr, this )}
+    
+    //add NEURON's built-in mechanism that can track number of AP events
+    access sourceCell.CellRef.soma
+
+    // insert stim object - we will vary the amp over several iterations
+    stim = new TStim(0.5)
+    
+    verbose = 0
+    I = 0
+    targetVm = $4
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * When running simuations, time and voltage vectors can be built and output after each iteration
+ * 
+ * $param @o1 cvode object which accepts the vectors to be populated by time and voltage values during simulation
+ */
+proc enableDebugging() {  localobj cvode
+    cvode = $o1
+    
+    access sourceCell.CellRef.soma
+    
+    somaVolt = new Vector()
+    somaTime = new Vector()
+    cvode.record(&v(0.5), somaVolt, somaTime)
+    
+    verbose = 1
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Run the cell for several iterations, trying to find a minimum current (I) which causes one and only one spike
+ * 
+ * @param $1 initHypAmp - This initial current is given to the exemplar in order to establish the baseline Vm
+ */
+proc exec() { local iteration, lastIwithAP, Imin, Imax, nAP
+    strdef tstr
+    
+    //set global NEURON variables
+    tstop = 200
+    dt = 0.025
+    
+    Imin = -2
+    Imax = 0
+    Iacceptable = 0
+    
+    iteration = 0
+    while( (abs(I - ((Imin + Imax)/2)) > 0.001) ) {    
+    
+        // for the first iteration, allow I to be 0 just to test that and be done
+        if( iteration == 0 ) {
+            I = 0
+        } else {
+            I = (Imin + Imax)/2
+        }
+        
+        // exemplar - use given hypamp
+        if( numarg() == 1 ) {
+            I = $1
+        }
+        
+        // reset the stimulus amp value and the count of APs 
+        stim.pulse( 50, 150, I )
+        
+        if( verbose==1 ) {
+            print "Running ", meFileName, " with I=", I, " ............"
+        }
+        run() //invoke NEURON's solver
+        
+        // exemplar - we're done
+        if( numarg() == 1 ) {
+            return
+        }
+        
+        // check soma's membrane voltage
+        access sourceCell.CellRef.soma
+        if( verbose == 1 ) {
+            print meFileName, " ", v
+        }
+        if( v < targetVm ) {
+            Iacceptable = I
+            Imin = I
+
+            if( iteration == 0 ) {
+                break
+            }
+        } else {
+            Imax = I
+        }
+
+        // save traces to help with debugging
+        if( verbose == 1 ) {
+            sprint( tstr, "%d.thresholdTrace.txt", iteration )
+            traceFile = new File( tstr )
+            traceFile.wopen()
+            
+            for i=0, somaVolt.size()-1 {
+                traceFile.printf( "%f %f\n", somaTime.x[i], somaVolt.x[i] )
+            }
+        }
+            
+        iteration = iteration+1
+    }
+    
+    // If our last iteration(s) didn't produce sufficient hyper polarizations, use one which did
+    I = Iacceptable
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * This function is intended to be used after the exemplar has run with the initial Hyppolarizing current.
+ * it will set the target Vm for further me combinations
+ *
+ * @return cell's membrane voltage to be used as target for other me combinations
+ */
+func getVm() {
+    access sourceCell.CellRef.soma
+    return v
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Given the cell has a reasonable threshold current, create a new CCell file filling in the
+ * computed value into the appropriate line.
+ */
+proc writeUpdatedCCell() {  local lineIndex, functionPresent  localobj srcFile, lines, oFile, strObj
+    strdef tstr
+    
+    strObj = new StringFunctions()
+    
+    srcFile = new File()
+    sprint(tstr, "%s/%s.hoc", parsedRun.get( "METypePath" ).s, meFileName)
+    srcFile.ropen(tstr)    
+    
+    //read all lines into memory before writing file so we can do an inplace edit if necessary
+    lines = new List()
+    while(srcFile.gets(tstr)> -1){
+        lines.append( new String( tstr ) )
+    }
+    
+    srcFile.close()
+    
+    oFile = new File()
+    sprint(tstr,"%s/%s.hoc", parsedRun.get( "OutputRoot" ).s, meFileName)
+    oFile.wopen(tstr)
+    
+    //for each line read from the source file, copy it to the destination file
+    // unless it deals with threshold - then spit out an updated line for the computed value
+    functionPresent = 0
+
+    for lineIndex=0,lines.count-1 {
+
+        // make sure we have not reached the end of the template without outputting the hypamp func
+        if( strObj.substr( lines.o(lineIndex).s, "endtemplate" ) != -1 ) {
+            if( functionPresent == 0 ) {
+                oFile.printf( "\npublic getHypAmp\n", I )
+                oFile.printf( "\nfunc getHypAmp(){return (%lf) }\n\n", I )
+            }
+        }
+
+        if(strObj.substr( lines.o(lineIndex).s, "func getHypAmp()") < 0) {
+            oFile.printf( "%s", lines.o(lineIndex).s )
+        } else {
+            oFile.printf( "\nfunc getHypAmp(){return (%lf) }\n", I )
+            functionPresent = 1
+        }
+    }
+
+    //verify that we wrote out the updated functions.  Otherwise, we need to spit out a warning
+    if( functionPresent == 0 ) {
+        print "Warning: input CCell template did not have getHypAmp function for updating.  Added."
+    }
+
+    oFile.close()
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Removes object references to the modeled cell so that it can be deleted and memory reclaimed
+ */
+proc clear() { localobj nil
+    sourceCell.CellRef.clear()
+    sourceCell = nil
+}
+
+endtemplate HypAmpSearch
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Utility function to check if some values were overridden on the command line
+ *
+ * e.g. nrngui -c varname=value HypAmpSearch.hoc
+ *
+ * @param $s1 name of variable to test
+ * @param $2  default value to give 
+ */
+
+proc default_var() {localobj s
+	if (name_declared($s1) == 0) {
+		s = new String()
+		hoc_ac_ = $2
+		sprint(s.s, "%s = hoc_ac_", $s1)
+		execute(s.s)
+	}
+}
+
+//-----------------------------------------------------------------------------------------------
+// Main Program: outer loop over all metypes in need of threshold detection
+//-----------------------------------------------------------------------------------------------
+
+// check for parameter overrides ( given to program as -c 'var=val'
+default_var( "initHypAmp", -0.116 )
+default_var( "targetVm", -0.70 )
+default_var( "exemplarLeads", 0 )
+
+objref configParser
+configParser = new ConfigParser()
+{configParser.open( "BlueConfig" )}
+
+/**
+ * callback function usabel by pc.submit.  Creates a HypAmpSearch object for a given metype/CCell and executes it
+ *
+ * @param $s1 filename
+ * @param $s2 template name
+ * @param $3 targetVm
+ * @param $4 verbose on(1) or off(0)
+ * @param $s5 morphology path to use
+ */
+func haBundle() { localobj haRunner
+    haRunner = new HypAmpSearch( configParser.parsedRun, $s1, $s2, $3, $s5 )
+        
+    //let node 0 print out every tenth cell assigned to it
+    if( $4==1 ) {
+        haRunner.enableDebugging( cvode )
+    }
+    
+    timeit_start(evalID)
+    haRunner.exec()
+    timeit_add(evalID)
+    
+    haRunner.writeUpdatedCCell()
+    haRunner.clear()
+    
+    return 1
+}
+
+strdef metypeLine, fileName, templateName
+objref fi
+
+objref pc
+pc = new ParallelContext()
+
+timeit_init(pc)
+if( pc.id() == 0 ) {
+    timeit_setVerbose(1)
+}
+evalID = timeit_register("evalcell")
+
+//turn on variable imestep method for faster processing
+objref cvode
+cvode = new CVode()
+{cvode_active(1)}
+
+{pc.runworker}
+
+//only the master cpu reaches here.  submit jobs for the workers to do
+
+//get list of metypes we need to instantiate and simulate
+fi = new File()
+{fi.ropen("metypeList.txt")}
+
+//first line has number of metypes that will appear on remaining lines
+n = 0
+{fi.gets(metypeLine)}
+{sscanf(metypeLine, "%d", &n)}
+
+// is the first line the exemplar metype?  That must be run first in order to establish targetVm
+objref exemplar, nil
+starting = 0
+if( exemplarLeads ) {
+    {fi.gets(metypeLine)}
+    {sscanf(metypeLine, "%s %s", fileName, templateName)}
+    
+    //run immediately, getting the targetVm
+    exemplar = new HypAmpSearch( configParser.parsedRun, fileName, templateName, 1, configParser.parsedRun.get("ExemplarMorphologyPath").s )
+
+    exemplar.exec( initHypAmp )
+    targetVm = exemplar.getVm()
+    print "Will use ", targetVm, " as target Vm"
+    
+    exemplar.clear()
+    exemplar = nil
+    
+    starting = 1
+}
+
+//for each metype (line), run another hoc file that does the Threshold detection
+for i=starting, n-1 {
+    {fi.gets(metypeLine)}
+    {sscanf(metypeLine, "%s %s", fileName, templateName)}
+    
+    pc.submit( "haBundle", fileName, templateName, targetVm, 0, configParser.parsedRun.get( "MorphologyPath" ).s )
+}
+while( pc.working) {
+}
+
+prtime()
+
+pc.done()
+quit()

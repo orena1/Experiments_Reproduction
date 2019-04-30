@@ -1,0 +1,438 @@
+/**
+ * @file ThresholdDetection.hoc
+ * @brief Reimplement ThresholdDetection algorithm in bglib1.5, using multisplit capabilities of the network simulation for better efficiency
+ * @author king
+ * @date 2012-02-14
+ * @remark Copyright © BBP/EPFL 2005-2012; All rights reserved. Do not distribute without further notice.
+ */
+
+{load_file("nrngui.hoc")}
+{load_file("netparmpi.hoc")}
+{load_file("timeit.hoc")}
+{load_file( "Node.hoc" )}
+
+{load_file("ConfigParser.hoc")}
+{load_file("TStim.hoc")}
+{load_file("Cell.hoc")}
+
+//-----------------------------------------------------------------------------------------------
+// Utility functions
+//-----------------------------------------------------------------------------------------------
+
+/// Alert the user when Connection Block of BlueConfig is not valid
+proc execConnectionParseError() {
+    { $o1.log( "ThresholdDetectionMultiSplit requires BlueConfig with only 1 Connection block, Weight set to 0.\n" ) }
+    quit()
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/// Alert the user when the RunMode has been overridden
+proc warnRunMode() {
+    { $o1.log( "ThresholdDetectionMultiSplit requires RunMode of LoadBalance.  Adjusting.\n" ) }
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Utility function to check if some values were overridden on the command line
+ *
+ * e.g. nrngui -c varname=value HypAmpSearch.hoc
+ *
+ * @param $s1 name of variable to test
+ * @param $2  default value to give 
+ */
+proc default_var() {localobj s
+	if (name_declared($s1) == 0) {
+		s = new String()
+		hoc_ac_ = $2
+		sprint(s.s, "%s = hoc_ac_", $s1)
+		execute(s.s)
+	}
+}
+
+//-----------------------------------------------------------------------------------------------
+// Global vars
+//-----------------------------------------------------------------------------------------------
+
+objref node, configParser
+objref gidvec, stimList, hypList, stim, cellObj, cellList, I, pc
+
+// check for parameter overrides.  given to program as -c 'var=val'
+default_var( "useHypAmp", 1 )
+default_var( "targetVm", -85 )
+
+//-----------------------------------------------------------------------------------------------
+// Major functions
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * When a cell's hypamp current is obtained, then the template can be updated.
+ *
+ * @param $o1 parsedRun
+ * @param $o2 meFileName
+ * @param $3 I to use for cell's hypamp current
+ */
+proc writeHypAmpIntoCCell() {  local I, lineIndex, functionPresent  localobj srcFile, lines, oFile, strObj, parsedRun, meFileName
+    strdef tstr
+    parsedRun = $o1
+    meFileName = $o2
+    I = $3
+    
+    strObj = new StringFunctions()
+    
+    srcFile = new File()
+    sprint(tstr, "%s/%s.hoc", parsedRun.get( "METypePath" ).s, meFileName.s )
+    srcFile.ropen(tstr)    
+    
+    //read all lines into memory before writing file so we can do an inplace edit if necessary
+    lines = new List()
+    while(srcFile.gets(tstr)> -1){
+        lines.append( new String( tstr ) )
+    }
+    
+    srcFile.close()
+    
+    oFile = new File()
+    sprint(tstr,"%s/%s.hoc", parsedRun.get( "METypePath" ).s, meFileName.s )
+    oFile.wopen(tstr)
+    
+    //for each line read from the source file, copy it to the destination file
+    // unless it deals with threshold - then spit out an updated line for the computed value
+    functionPresent = 0
+
+    for lineIndex=0,lines.count-1 {
+
+        // make sure we have not reached the end of the template without outputting the hypamp func
+        if( strObj.substr( lines.o(lineIndex).s, "endtemplate" ) != -1 ) {
+            if( functionPresent == 0 ) {
+                oFile.printf( "\npublic getHypAmp\n", I )
+                oFile.printf( "\nfunc getHypAmp(){return (%lf) }\n\n", I )
+            }
+        }
+
+        if(strObj.substr( lines.o(lineIndex).s, "func getHypAmp()") < 0) {
+            oFile.printf( "%s", lines.o(lineIndex).s )
+        } else {
+            oFile.printf( "\nfunc getHypAmp(){return (%lf) }\n", I )
+            functionPresent = 1
+        }
+    }
+
+    //verify that we wrote out the updated functions.  Otherwise, we need to spit out a warning
+    if( functionPresent == 0 ) {
+        //print "Warning: input CCell template did not have getHypAmp function for updating.  Added."
+    }
+
+    oFile.close()
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Given the cell has a reasonable threshold current, create a new CCell file filling in the
+ * computed value into the appropriate line.
+ *
+ * @param $o1 parsedRun
+ * @param $o2 meFileName
+ * @param $3 I to use for cell's threshold current
+ */
+proc writeThresholdIntoCCell() {  local lineIndex, I  localobj srcFile, lines, oFile, meFileName, parsedRun, strObj
+    strdef tstr
+    parsedRun = $o1
+    meFileName = $o2
+    I = $3
+    
+    strObj = new StringFunctions()
+    
+    if( I == 0 ) {
+        //never spiked - don't write file
+        print "Ineffective combination - should be removed\n"
+    }else {
+        srcFile = new File()
+        sprint(tstr, "%s/%s.hoc", parsedRun.get( "METypePath" ).s, meFileName.s )
+        srcFile.ropen(tstr)    
+        
+        //read all lines into memory before writing file so we can do an inplace edit if necessary
+        lines = new List()
+        while(srcFile.gets(tstr)> -1){
+            lines.append( new String( tstr ) )
+        }
+        
+        srcFile.close()
+        
+        oFile = new File()
+        sprint(tstr,"%s/%s.hoc", parsedRun.get( "METypePath" ).s, meFileName.s )
+        oFile.wopen(tstr)
+        
+        //for each line read from the source file, copy it to the destination file
+        // unless it deals with threshold - then spit out an updated line for the computed value
+        for lineIndex=0,lines.count-1 {
+            if(strObj.substr( lines.o(lineIndex).s, "func getThreshold()") < 0) {
+                oFile.printf( "%s", lines.o(lineIndex).s )
+            } else {
+                oFile.printf( "\nfunc getThreshold(){return (%lf) }\n", I )
+            }
+        }
+        
+        oFile.close()
+    }
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Run some iterations of the cells to determine a current that will depolarize the cells to a specific voltage
+ */
+proc runHypAmpSearch() { local iteration  localobj Iacceptable, Imin, Imax, lastIwithAP, isDoubling
+    strdef tstr
+    
+    //set global NEURON variables
+    tstop = 200
+    dt = 0.025
+    
+    Iacceptable = new Vector( cellList.count(), 0 )
+    Imin = new Vector( cellList.count(), -2 )
+    Imax = new Vector( cellList.count(), 0 )
+
+    // should already be 0, but just to be sure
+    for cellIndex=0, cellList.count()-1 {
+        I.x[cellIndex] = 0
+    }
+    
+    for iteration=1,15 {
+    
+        // for the first iteration, allow I to be 0 just to test that and be done
+        for cellIndex=0,cellList.count()-1 {
+            if( iteration > 1 ) {
+                I.x[cellIndex] = (Imin.x[cellIndex] + Imax.x[cellIndex])/2
+            }
+            
+            // reset the stimulus amp value and the count of APs 
+            stimList.o(cellIndex).pulse( 50, 150, I.x[cellIndex] )
+            
+            if( verbose==1 ) {
+                print "Running ", cellList.o(cellIndex), " with I=", I.x[cellIndex], " ............"
+            }
+        }
+        
+        {node.prun()}
+        
+        for cellIndex=0,cellList.count()-1 {
+            // check soma's membrane voltage
+            access cellList.o(cellIndex).soma
+            if( verbose == 1 ) {
+                print cellList.o(cellIndex), " ", v
+            }
+            if( v < targetVm ) {
+                Iacceptable.x[cellIndex] = I.x[cellIndex]
+                Imin.x[cellIndex] = I.x[cellIndex]
+
+            } else {
+                Imax.x[cellIndex] = I.x[cellIndex]
+            }
+        }
+    }
+    
+    // If our last iteration(s) didn't produce sufficient hyper polarizations, use one which did
+    for cellIndex=0, cellList.count()-1 {
+        I.x[cellIndex] = Iacceptable.x[cellIndex]
+    }
+
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Run some iterations of the cells trying to find appropriate current (I) values such that they elicit
+ * a single spike from the cells.
+ */
+proc runThresholdDetection() { local iteration  localobj lastIwithAP, isDoubling, Imin, Imax
+    
+    tstop = 2000
+    dt = 0.025
+    
+    lastIwithAP = new Vector( cellList.count(), 0 )
+    isDoubling = new Vector( cellList.count(), 1 )
+    Imin = new Vector( cellList.count(), 0 )
+    Imax = new Vector( cellList.count(), 0.01 )
+    //Imax = new Vector( cellList.count(), 0 )
+    
+    for iteration=0,15 {
+        for cellIndex=0,cellList.count()-1 {
+            if( isDoubling.x[cellIndex] ) {
+                I.x[cellIndex] = Imax.x[cellIndex]*2
+            } else {
+                I.x[cellIndex] = (Imin.x[cellIndex] + Imax.x[cellIndex])/2
+            }
+            
+            // reset the stimulus amp value and the count of APs 
+            stimList.o(cellIndex).pulse( 700, 1000, I.x[cellIndex] )
+            cellList.o(cellIndex).APC.n = 0
+        }
+        
+        {node.prun()}
+        
+        for cellIndex=0,cellList.count()-1 {
+            // print some info
+            nAP = cellList.o(cellIndex).APC.n
+            if( verbose==1 ) {
+                print cellList.o(cellIndex), "No of action potentials are : ", nAP,  " for I = ", I.x[cellIndex]
+            }
+            
+            if(nAP > 0){
+                Imax.x[cellIndex] = I.x[cellIndex]
+                lastIwithAP.x[cellIndex] = I.x[cellIndex]
+
+                if( isDoubling.x[cellIndex] ) {
+                    isDoubling.x[cellIndex] = 0
+                }
+            } else {
+                if( isDoubling.x[cellIndex] ) {
+                    Imin.x[cellIndex] = Imax.x[cellIndex]
+                    Imax.x[cellIndex] = I.x[cellIndex]
+                } else {
+                    Imin.x[cellIndex] = I.x[cellIndex]
+                }
+            }
+        }
+    }
+
+    for cellIndex=0,cellList.count()-1 {
+        // If our last iteration(s) didn't producea a spike, go back to the last current which did
+        if( lastIwithAP.x[cellIndex] != I.x[cellIndex] ) {
+            I.x[cellIndex] = lastIwithAP.x[cellIndex]
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------------------------
+// Main Program
+//-----------------------------------------------------------------------------------------------
+
+//create network - no synapses
+
+
+// For now, only support BlueConfig as input name.
+strdef configFile
+configFile = "BlueConfig"
+
+node = new Node( configFile )
+
+// verify that we have exactly 1 Connection block with Weight 0.
+//  this should be done by whatever application invokes ThresholdDetectionMultiSplit, but not difficult to verify
+configParser = node.configParser
+//{configParser.open( configFile )}
+
+if( configParser.parsedConnects.count() != 1 ) {
+    execConnectionParseError( node )
+}
+if( !configParser.parsedConnects.o(0).exists( "Weight" ) ) {
+    execConnectionParseError( node )
+}
+if( configParser.parsedConnects.o(0).valueOf( "Weight" ) != 0.0 ) {
+    execConnectionParseError( node )
+}
+
+// require RunMode to be LoadBalance
+if( !configParser.parsedRun.exists( "RunMode" ) ) {
+    configParser.parsedRun.put( "RunMode", new String("LoadBalance") )
+    warnRunMode( node )
+}
+objref runMode
+runMode = configParser.parsedRun.get("RunMode")
+if( strcmp( runMode.s, "LoadBalance" ) != 0 ) {
+    sprintf( runMode.s, "LoadBalance" )
+    warnRunMode( node )
+}
+
+// can now begin - but Node 
+{node.loadTargets()}
+{node.computeLB()}
+{node.createCells()}
+{node.enableReports()}
+
+pc = new ParallelContext()
+
+// need to set stimulus for each cell on local cpu - this will be modified with each run iteration
+gidvec = node.cellDistributor.getGidListForProcessor()
+
+stimList = new List()
+hypList = new List()
+cellList = new List()
+
+//useHypAmp = 0
+hypAmpFailure = 0
+
+verbose = 0
+if( pc.id() == 0 || pc.id() == 31 ) {
+    verbose = 1
+}
+
+// The circuit is instantiated, gather some information and configure stimulus objects
+// I could make this next part nicer, but later.  I know that if a cell has a differing gid and an spgid, 
+// then it is a non-soma containing piece. I only want to set stim on the soma, so that helps to limit the cells I care about
+for cellIndex=0, gidvec.size()-1 {
+    vgid = node.cellDistributor.getSpGid( gidvec.x[cellIndex] )
+    if( vgid == gidvec.x[cellIndex] ) {
+        // have soma, so can set stim
+        cellObj = node.cellDistributor.getCell( gidvec.x[cellIndex] )
+        access cellObj.soma
+        cellObj.APC = new APCount(0.5)
+        cellObj.APC.thresh = -30
+        cellList.append( cellObj )
+        
+        stim = new TStim(0.5)
+        stimList.append( stim )
+        
+        if( useHypAmp ) {
+            stim = new TStim(0.5)
+            ret = execute1( "{getHypAmp()}", cellObj.getCCell(), 0 )
+            if( ret != 0 ) {//we would get a non-zero if the function could successfully be called
+                if( verbose==1 ) {
+                    print "Applying hyperpolarization current of ", cellObj.getCCell().getHypAmp()
+                }
+                stim.pulse( 0, 3000, cellObj.getCCell().getHypAmp() )
+            } else { //since some cell does not have hypamp current, we must calculate that first
+                hypAmpFailure = 1
+            }
+            hypList.append(stim)
+        }
+    }
+}
+
+// check how many cells need the hypamp calculated.  Most likely all or nothing.
+hypAmpFailure = pc.allreduce(hypAmpFailure,1)
+
+I = new Vector( cellList.count(), 0 )
+
+if( useHypAmp && hypAmpFailure > 0 ) {
+    // run hypamp
+    if( pc.id() == 0 ) {
+        print "Will run hyp amp computation."
+    }
+    
+    runHypAmpSearch()
+    
+    // write out updated templates
+    for cellIndex=0, cellList.count()-1 {
+        writeHypAmpIntoCCell( configParser.parsedRun, node.cellDistributor.getMEFileFromGid( cellList.o(cellIndex).gid ), I.x[cellIndex] )
+        
+        // -> but we cannot reload the new templates we just wrote; must use I value to set hypamp stim
+        hypList.o(cellIndex).pulse( 0, 3000, I.x[cellIndex] )
+    }
+    
+    // reinit I array for threshold detection
+    for cellIndex=0, cellList.count()-1 {
+        I.x[cellIndex] = 0
+    }
+}
+
+runThresholdDetection()
+
+// need all cpus to write out the new templates.
+for cellIndex=0, cellList.count()-1 {
+    writeThresholdIntoCCell( configParser.parsedRun, node.cellDistributor.getMEFileFromGid( cellList.o(cellIndex).gid ), I.x[cellIndex] )
+}
+
+//TODO: should I do this simulation in the normal bglib way?  Just need a way to deal with hypamp

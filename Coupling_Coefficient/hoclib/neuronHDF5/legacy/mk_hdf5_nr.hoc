@@ -1,0 +1,238 @@
+// defaults
+load_file("nrngui.hoc") // perhaps only stdlib.hoc required
+
+
+strdef prefix, tstr
+//sprint(prefix,"")
+sprint(prefix,"/opt/neuronHDF5/")
+
+sprint(tstr,"%s%s", prefix, "import3d_outline.hoc")
+
+load_file(tstr)
+objref cell, import
+
+// important! clear default path
+strdef morphology_path, CellPath, outputPath
+morphology_path = ""
+sprint(CellPath,"%s", prefix)
+//CellPath    = "/opt/neuronHDF5"
+sprint(outputPath,"%s%s", prefix,"output")
+//outputPath  = "/opt/neuronHDF5/output"
+
+// some vars
+strdef fileName, srcFile, targetFile
+objref file
+objref cell, NULLcell, UnValidFiles, myCell
+objref stim1,stim2,vec, apc, hdf5
+vec = new Vector()
+
+objref s
+strdef tmpstr, result
+
+objref strobj
+strobj = new StringFunctions()
+
+func parentNo() { localobj ls
+  retval = -1
+  ls = new SectionRef()
+  if (ls.has_parent() == 1) {
+    ls.parent {
+      sprint(tmpstr, "%s",secname())
+//      print secname(), " diam=", diam
+    }
+    strobj.tail(tmpstr, $s1, result) // result should look like [n]
+    if (strobj.len(result) > 0) {
+      strobj.left(result, strobj.len(result)-1) // result should look like [n
+      strobj.right(result, 1)
+      sprint(tmpstr, "retval = %s", result)
+      execute(tmpstr)
+    }
+	    
+  }
+  return retval
+}
+
+
+objref nl
+		
+obfunc createSingleCell(){ localobj import, strobj
+        print "Neurolucida Ascii File = ",$s1,"  CellType File = ", $s2
+        strdef str       
+        if(4 != numarg()){       
+                print "Error: Usage Morphology file path and Electrical CellType Path"
+                return
+        }
+        strobj = new StringFunctions()
+        sprint(str,"%s/%s",$s4,$s2)
+        print "CellTypePath = " , str
+        load_file(str)
+        length = strobj.len($s2)
+        sprint(str,"%s",$s2)
+        strobj.left(str, length-4) //Remove .hoc from file name
+        sprint (str, "cell = new %s()", str)
+        execute(str)
+        nl = new Import3d_Neurolucida3()
+        sprint(str,"%s/%s",$s3,$s1)
+        nl.input(str)
+        import = new Import3d_GUI(nl, 0)
+        import.instantiate(cell)
+	
+        return cell
+}
+
+// read file with has a list of NL-files
+
+sprint(tstr,"%s%s", prefix, "to_convert.tmp")
+file = new File(tstr)
+
+//file = new File("/opt/neuronHDF5/to_convert.tmp")
+file.ropen()
+
+filesCount=1
+//hoc_stdout("validate_out")
+while(file.scanstr(fileName)>-1){//scan for the next string.
+ 	strobj.left(fileName, strobj.len(fileName)-4)
+    	sprint(srcFile, "%s.asc", fileName)
+	strobj.tail(fileName, "/.+/", targetFile)
+    	sprint(targetFile, "%s/%s.h5", outputPath, targetFile)
+	print ""
+	print "Neuron filename:", srcFile, " file#:", filesCount
+	print "output filename:", targetFile
+	
+	// by default it adds it to a cell_list; here, only one file is in the cell list
+	cell = NULLcell
+	ret = execute1("cell = createSingleCell(srcFile, \"PC.hoc\", morphology_path, CellPath)")
+	print "Ret after cell create is ", ret 
+	if((ret == 1) && (cell != NULLcell)) {
+		secCount = 0
+		curSec = 0
+		ptCount = 0
+
+		x_avg = 0
+		y_avg = 0
+		z_avg = 0
+		somaCount = 0
+
+		// have to determine numbers of sections in each subset...
+
+		axonOff = 0
+		forsec cell.somatic {
+			secCount += 1
+			ptCount += n3d()
+
+			// ok, get the soma center of gravity
+			somaCount += n3d()
+		  	for (k=0; k < n3d(); k += 1) {
+				x_avg += x3d(k)
+				y_avg += y3d(k)
+				z_avg += z3d(k)
+				print "soma point pt=(", x3d(k), ", ", y3d(k), ", ", z3d(k), ")"
+			}
+		}
+		axonOff = secCount
+		// ok, get the soma center of gravity
+		x_avg = x_avg/somaCount
+		y_avg = y_avg/somaCount
+		z_avg = z_avg/somaCount
+		
+//		x_avg = 0
+//		y_avg = 0
+//		z_avg = 0
+//		print "all points will be corrected by off=(", -x_avg, ", ", -y_avg, ", ", -z_avg, ")"
+
+		basalOff = 0
+		forsec cell.axonal {
+			secCount += 1
+			ptCount += n3d()
+		}
+		basalOff = secCount
+
+		apicOff = 0
+		forsec cell.basal {
+			secCount += 1
+			ptCount += n3d()
+		}
+		apicOff = secCount
+
+		forsec cell.apical {
+			secCount += 1
+			ptCount += n3d()
+		}
+
+
+		// now we have all the information
+
+   		access cell.soma[0]
+		hdf5 = new HDF5(.5)
+		hdf5.setup(targetFile, secCount, 3, ptCount, 4)
+		
+		ptRef = 0
+		forsec cell.somatic {
+			area(.5) // hack!
+		  	hdf5.addSection(ptRef, 1, parentNo("soma"))
+		  	for (j=0; j < n3d(); j += 1) {
+				hdf5.addPoint(x3d(j), y3d(j), z3d(j), diam3d(j))
+//				hdf5.addPoint(x3d(j)-x_avg, y3d(j)-y_avg, z3d(j)-z_avg, diam3d(j))
+				ptRef += 1
+		  	}
+//			print "section: ", secname(), " parent= ", parentNo("soma")
+		}
+
+		forsec cell.axonal {
+			area(.5) // hack!
+			
+			parent = parentNo("soma")
+			if (parent == -1) {
+  				parent = axonOff + parentNo("axon")
+			}
+
+		  	hdf5.addSection(ptRef, 2, parent)
+		  	for (j=0; j < n3d(); j += 1) { 
+				hdf5.addPoint(x3d(j), y3d(j), z3d(j), diam3d(j))
+//				hdf5.addPoint(x3d(j)-x_avg, y3d(j)-y_avg, z3d(j)-z_avg, diam3d(j))
+				ptRef += 1
+		  	}
+//			print "section: ", secname(), " parent= ", parentNo("soma|axon|dend|apic")
+		}
+
+		forsec cell.basal {
+			area(.5) // hack!
+			parent = parentNo("soma")
+			if (parent == -1) {
+				parent = basalOff + parentNo("dend")
+			}
+
+		  	hdf5.addSection(ptRef, 3, parent)
+		  	for (j=0; j < n3d(); j += 1) {
+				hdf5.addPoint(x3d(j), y3d(j), z3d(j), diam3d(j))
+//				hdf5.addPoint(x3d(j)-x_avg, y3d(j)-y_avg, z3d(j)-z_avg, diam3d(j))
+				ptRef += 1
+		  	}
+//			print "section: ", secname(), " parent= ", parentNo("soma|axon|dend|apic")
+		}
+
+		forsec cell.apical {
+			area(.5) // hack!
+			parent = parentNo("soma")
+			if (parent == -1) {
+				parent = apicOff + parentNo("apic")
+			}
+
+		  	hdf5.addSection(ptRef, 4, parent)
+		  	for (j=0; j < n3d(); j += 1) {
+				hdf5.addPoint(x3d(j), y3d(j), z3d(j), diam3d(j))
+//				hdf5.addPoint(x3d(j)-x_avg, y3d(j)-y_avg, z3d(j)-z_avg, diam3d(j))
+				ptRef += 1
+		  	}
+//			print "section: ", secname(), " parent= ", parentNo("soma|axon|dend|apic")
+		}
+
+		hdf5.save()
+	}else {
+		print "*******CreateCell failed for cell ", srcFile, "**********"
+	}
+
+	filesCount+=1
+}
+file.close()
+//quit()

@@ -1,0 +1,26 @@
+/**
+ * @file PrepConfig.hoc
+ * @brief Helper hoc to workaround bgp mangling commandline arguments with spaces 
+ * @author king
+ * @date 2011-06-15
+ * @remark Copyright © BBP/EPFL 2005-2011; All rights reserved. Do not distribute without further notice.
+ */
+
+// Adds strdef 'configFile' to global namespace so that a later command line argument similar to
+// -c configFile=\"my.cfg\" will execute successfully.
+
+strdef configFile
+configFile = "BlueConfig"
+strdef simulator
+simulator = "NEURON"
+
+// further notes: Normally, the default config file if "BlueConfig".  To override, one could give the
+// following on a linux box.
+//
+// mpirun -np 4 ./x86_64/special -c "strdef configFile" -c configFile="my.cfg" init.hoc
+//
+// and this would change the config file.  On bgp, though, the "strdef configFile" will be split into two fields
+// despite the double quotes.  This hoc file acts as a workaround so that the command looks instead like
+//
+// mpirun -np 4 ./powerpc64/special PrepConfig.hoc -c configFile="my.cfg" init.hoc
+

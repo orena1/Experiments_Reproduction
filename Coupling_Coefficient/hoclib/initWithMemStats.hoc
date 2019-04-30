@@ -1,0 +1,274 @@
+/**
+ * @file initWithMemStats.hoc
+ * @brief 
+ * @author king
+ * @date 2011-02-04
+ * @remark Copyright © BBP/EPFL 2005-2011; All rights reserved. Do not distribute without further notice.
+ */
+
+// Note: init.hoc now outputs the same info as initWithMemStats.hoc; users should switch to that
+// we will maintain this for a little while longer
+
+//object for profiling pause/resume interface
+objref profileHelper, simConfig
+
+profileHelper = new ProfileHelper()
+
+//pause profiling at the begining, will be resumed for psolve
+{profileHelper.pause_profiling()}
+
+// setup simulator
+{load_file( "defvar.hoc" )}
+default_var("simulator", "NEURON")
+
+
+//In place of init.hoc, use this to test things as they progress.
+//Sample bglib/bluebrain sequence
+
+// imports/loads
+{load_file( "nrngui.hoc" )}
+{load_file( "netparmpi.hoc" )}
+{load_file( "Node.hoc" )}
+{load_file( "ShowProgress.hoc" )}
+{load_file( "timeit.hoc" )}
+
+{nrnpython( "import shutil" )}
+
+
+//objects for network creation
+objref cvode
+objref node, progress, memusage
+
+// simulation configurations
+simConfig = new SimSettings()
+
+//for memory profiliing
+memusage = new MemUsage()
+{memusage.print_mem_usage()}
+
+//read BlueConfig - default is "BlueConfig" unless the strdef variable 'configFile' is set at the global level
+configOverride = name_declared("configFile")
+if (configOverride == 4) {  //is a strdef, we can use that
+    node = new Node( configFile )
+} else {
+    if (configOverride != 0) {  //var is declared, but unhandled type: objref, scalar, or section; print a warning
+        // Note: I don't have the parallel net manager yet, and I don't want to print ncpu messages.  Defer the warning until later
+        warn = 1
+    }
+    node = new Node( "BlueConfig" )
+
+    if( warn ) {
+        node.log( "Warning: variable 'configFile' declared, but not as strdef.  Using default \"BlueConfig\"" )
+    }
+}
+
+// advise against initWithMemStats.hoc
+{node.log( "\n\nWarning: initWithMemStats.hoc will be deprecated.  Switch to init.hoc\n\n" )}
+
+//-----------------------------------------------------------------------------------------------
+//read Targets (start.target/user.target)
+//-----------------------------------------------------------------------------------------------
+
+timeit() //(re)init timer
+{node.log( "load targets" )} //targets after initial load are the same regardless of load balancing
+{node.loadTargets()}
+{memusage.print_mem_usage()}
+timeit( "Target Load" )
+
+objref pc, targetName, allgids
+objref cndatafile, cnfilename, cndataline, commvec, targetList, cngather
+
+if( simConfig.coreNeuronUsed() && node.configParser.parsedRun.exists( "Restore" ) ) {
+  node.log( "Skip general model building workflow - CoreNEURON + Restore detected" )
+  
+  // only need to do stimulus? (replay specifically)
+  {node.enableReplay()}
+  {node.enableReports()}
+
+  {node.postRestoreConfig()}
+} else {
+
+// loop for number of chunks:
+objref pc, targetName, allgids
+objref cndatafile, cnfilename, cndataline, commvec
+pc = new ParallelContext()
+commvec = new Vector(1)
+
+ncycles = 1
+objref targetList
+targetList = node.splitDataGeneration()
+
+// for compatibility, targetList might be empty but we still should execute 1 cycle
+strdef message
+startCycle = 0
+if( targetList.count() > 0 ) {
+    ncycles = targetList.count()
+    if( pc.id() == 0 ) {
+        sprint( message, "Generating %d targets for multiple cycles of CoreNeuron data generation", targetList.count() )
+        print message
+    }
+    
+    if( ncycles > 1 ) {
+        // resume? check for existing files_x.dat
+        if( pc.id() == 0 ) {
+            cnfilename = new String()
+            for cycleIndex=0,ncycles-1 {
+                sprint( cnfilename.s, "%s/coreneuron_input/files_%d.dat", node.configParser.parsedRun.get( "OutputRoot" ).s, cycleIndex )
+                cndatafile = new File()
+                cndatafile.ropen( cnfilename.s )
+                if( cndatafile.isopen() ) {
+                    startCycle = cycleIndex+1
+                } else {
+                    break
+                }
+            }
+            commvec.x[0] = startCycle
+        }
+        pc.broadcast( commvec, 0 )
+        startCycle = commvec.x[0]
+    }
+}
+
+for cycleIndex=startCycle,ncycles-1 {
+
+    // if multple cycles, need to partition
+    if( ncycles > 1 ) {
+        sprint( node.configParser.parsedRun.get( "CircuitTarget" ).s, targetList.o(cycleIndex).name )
+        node.log( "build model for target" )
+        node.log( targetList.o(cycleIndex).name )
+    }
+
+    {node.computeLB()}
+    {memusage.print_mem_usage()}
+    timeit("Compute LB")
+
+    {node.log( "create model for simulation" )}
+
+    //-----------------------------------------------------------------------------------------------
+    // create cells
+    //-----------------------------------------------------------------------------------------------
+
+    {node.createCells()}
+    {node.log( "done cells" )}
+    {memusage.print_mem_usage()}
+    //sf.references( Cell[0] )
+    timeit( "Cell creation" )
+
+    // Apply any cell value overrides as defined by user in BlueConfig
+    {node.executeNeuronConfigures()}
+
+    //-----------------------------------------------------------------------------------------------
+    // create connections
+    //-----------------------------------------------------------------------------------------------
+    {node.createSynapses()}
+    {node.log( "done synapses" )}
+    {memusage.print_mem_usage()}
+    timeit("Synapse creation")
+
+    {node.createGapJunctions()}
+    {node.log( "done gap junctions" )}
+    {memusage.print_mem_usage()}
+    timeit("Gap Junction creation")
+
+    //-----------------------------------------------------------------------------------------------
+    // Do we need to restore network state?  Preliminary load
+    //-----------------------------------------------------------------------------------------------
+
+    {node.checkResume()}
+
+    //-----------------------------------------------------------------------------------------------
+    // use targets
+    //-----------------------------------------------------------------------------------------------
+
+    //we're going to have separate objects handling stimulus instantiation.  should they do it out here, or within
+    // the Node object?  Should both options be available to the user?  The Node object handles declared stims in the BlueConfig
+    // but the user has the option to create stims separately?
+
+    //create stims
+    {node.log( "Enable Stimulus" )}
+    {node.enableStimulus()}
+    {memusage.print_mem_usage()}
+
+    //apply any modifications
+    {node.log( "Enable Modifications" ) }
+    {node.enableModifications()}
+    {memusage.print_mem_usage()}
+
+    //create reports
+    {node.log( "Enable Reports" )}
+    {node.enableReports()}
+    {memusage.print_mem_usage()}
+
+    //finish setup
+    timeit() //(re)init timer
+    {node.finalizeModel()}
+
+    {memusage.print_mem_usage()}
+    timeit( "finished setup")
+    
+    if( ncycles > 1 ) {
+        node.log( "clear model" )
+        node.clearModel()
+
+        // rank 0 should take info from files.dat to output a merged version
+        if( pc.id() == 0 ) {
+            cnfilename = new String()
+            sprint( cnfilename.s, "shutil.copy2( \"%s/coreneuron_input/files.dat\", \"%s/coreneuron_input/files_%d.dat\" )", node.configParser.parsedRun.get( "OutputRoot" ).s, node.configParser.parsedRun.get( "OutputRoot" ).s, cycleIndex )
+            {nrnpython(cnfilename.s)}
+        }
+    }  // end clean up between multiple cycles
+}  // end cycle loop
+
+objref cngather
+
+// rank 0 creates single files.dat (if needed)
+if( ncycles > 1 && pc.id() == 0 ) {
+    print "Generating merged files.dat"
+    cngather = new List()
+
+    for cycleIndex=0,ncycles-1 {
+            cndatafile = new File()
+            cnfilename = new String()
+            cndataline = new String()
+            sprint( cnfilename.s, "%s/coreneuron_input/files_%d.dat", node.configParser.parsedRun.get( "OutputRoot" ).s, cycleIndex )
+            cndatafile.ropen( cnfilename.s )
+            {cndatafile.gets( cndataline.s )}
+            if( cycleIndex == 0 ) {
+                cngather.append( new String( cndataline.s ) )
+            }
+            nlines = cndatafile.scanvar()  // should be nranks
+            for lineIndex=0, nlines-1 {
+                cngather.append( new String() )
+                {cndatafile.gets( cngather.o(cngather.count()-1).s )}
+            }
+            cndatafile.close()
+    }
+
+    cndatafile = new File()
+    cnfilename = new String()
+    cndataline = new String()
+    sprint( cnfilename.s, "%s/coreneuron_input/files.dat", node.configParser.parsedRun.get( "OutputRoot" ).s )
+    print "write ", cnfilename.s
+    cndatafile.wopen( cnfilename.s )
+    cndatafile.printf( cngather.o(0).s )
+    cndatafile.printf( "%d\n", cngather.count()-1 )
+    for lineIndex=1, cngather.count()-1 {
+        cndatafile.printf( cngather.o(lineIndex).s )
+    }
+    cndatafile.close()
+    print "done merging files.dat"
+}
+
+} //end test restore + coreneuron
+
+// Can actually run model now
+timeit() //(re)init timer
+{node.log( "run" )}
+{node.prun()}
+{memusage.print_mem_usage()}
+timeit( "finished Run")
+
+//clean up and exit
+{node.cleanup()}
+quit()
+

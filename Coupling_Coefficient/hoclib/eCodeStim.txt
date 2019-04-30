@@ -1,0 +1,28 @@
+stimulus
+0	TesteCode	Pulse(100, 0.1, 0.5)			A	1e-12	100	0.7
+1	APThreshold	Ramp(0, 400, 0.1, 2)			A	1e-12	100	2.2
+2	IRrest	Pulse(-40, 0.6, 0.2)			A	1e-12	100	1.2
+3	IRhyperpol	Pulse(-100, 0.1, 0.8);Pulse(-140, 0.6, 0.2)			A	1e-12	100	1.2
+4	IRdepol	Pulse(80, 0.1, 0.8);Pulse(40, 0.6, 0.2)			A	1e-12	100	1.2
+5	IV	Pulse($, 0.1, 1)	-140:20:80		A	1e-12	100	1.5
+6	APWaveform	Pulse($, 0.005, 0.05)	200:40:400		A	1e-12	10	0.06
+7	sAHP	Pulse(80, 0.1, 2.7);Pulse($, 0.6, 0.2)	150:50:400		A	1e-12	100	2.9
+8	IDrest	Pulse($, 0.7, 2)	120:20:300		A	1e-12	100	3
+9	IDdepol	Pulse(70, 0.1, 2.8);Pulse($, 0.7, 2)	150:50:250		A	1e-12	100	3
+10	IDhyperpol	Pulse(-70, 0.1, 2.8);Pulse($, 0.7, 2)	150:50:250		A	1e-12	100	3
+11	IDthresh	Pulse($, 0.7, 2)	90:3:150		A	1e-12	100	3
+12	Spontaneous				A	1e-12	100	10.4
+13	HighResThResp	Pulse(100, 0.1, 0.5)			A	1e-12	50	0.85
+14	SpontAPs	Pulse(120, 0.2, 10)			A	1e-12	100	10.4
+15	Delta	Pulse(-400, 0.02, 0.005)			A	1e-12	100	0.325
+16	ADHPdepol	Pulse(20, 0.01, 0.15); Train(1400, 0.01, 0.003, 1/0.053, 3)			A	1e-12	100	0.17
+17	ADHPhyperpol	Pulse(-20, 0.01, 0.15); Train(1400, 0.01, 0.003, 1/0.053, 3)			A	1e-12	100	0.17
+18	ADHPrest	Pulse(0, 0.01, 0.15); Train(1400, 0.01, 0.003, 1/0.053, 3)			A	1e-12	100	0.17
+19	APDrop	Pulse(260,0.005,0.5)			A	1e-12	50	0.51
+20	SpikeRec	Segments("0;0.01;120;0.0035;0;$;120;0.0025")	0:0.01:0.05		A	1e-12	50	0.07
+21	NoiseSpiking	PQLoad("NoiseWave.ibw");w*=4;w(inf)=0			A	1e-12	250	5
+22	SineSpec	PQLoad("SineSpec.ibw")			A	1e-10	250	2.5
+23	NoisePP	PQLoad("NoiseWave.ibw");w*=3;w(inf)=0			A	1e-12	250	5
+24	Truenoise	PQLoad("truenoise.ibw")			A	1e-12	250	5
+25	C1HP1sec	Pulse($, 1,1)	-100:10:-10		A	1e-12	250	3
+

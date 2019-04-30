@@ -1,0 +1,208 @@
+/**
+ * @file BasicCellLoader.hoc
+ * @brief 
+ * @author king
+ * @date 2014-31-01
+ * @remark Copyright © BBP/EPFL 2005-2014; All rights reserved. Do not distribute without further notice.
+ */
+
+// imports/loads
+{load_file( "nrngui.hoc" )}
+{load_file( "netparmpi.hoc" )}
+{load_file( "ConfigParser.hoc" )}
+{load_file( "Cell.hoc" )}
+{load_file( "TDistFunc.hoc" )}
+
+/**
+ * Try to provide a simple interface to allow a user to load arbitrary cells from a circuit.
+ * This currently uses the node object which may be too heavy.  Should try to reduce the complexity
+ * of the objects used by refactoring out commonly needed features
+ */
+begintemplate BasicCellLoader
+
+objref config, cell, this
+objref allgid, allmetype, gidIndexed
+
+public init, createCell
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Read in a BlueConfig so as to have the paths for the circuit, morphologies, and metypes.
+ * Immediately read the start.ncs file
+ *
+ * @param $s1 BlueConfig
+ */
+proc init() {
+    config = new ConfigParser()
+    config.open( $s1 )
+    readNCS( config.parsedRun.get( "nrnPath" ).s, allgid, allmetype )
+
+    gidIndexed = allgid.sortindex()
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Given a gid, load that cell's template (if needed) and return an instantiation of that cell
+ *
+ * @param $1 gid
+ * @return instantiated cell
+ */
+obfunc createCell() { local res  localobj metype
+    strdef tstr
+
+    metype = findMEType($1)
+    if( object_id( metype, 1 ) == -1 ) {
+        print "gid ", $1, " not found in circuit"
+        return cell
+    }
+    
+    // note that metype template names and filenames will differ if they used special charaters [.-()]
+    // manually read the file a little bit to get the NEURON usable name
+
+    metype = loadTemplate( config.parsedRun.get("METypePath"), metype )
+    sprint( tstr, "cell = new %s( %d, \"%s/ascii\" )", metype.s, $1, config.parsedRun.get("MorphologyPath").s )
+    res = execute1( tstr, this )
+    if( res == 0 ) {
+        print "Error instantiating gid ", $1
+    }
+
+    return cell
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * load start.ncs getting the gids and the metypes for all cells in the base circuit
+ * (note that we may simulate less if there is a circuit target present in the blue config file)
+ *
+ * @param $s1 path to nrn files
+ * @param $o2 where gids should be stored
+ * @param $o3 where metypes should be stored
+ */
+proc readNCS() { local cellCount, gid, nErrors  localobj ncsIn, bvec
+    strdef ncsFile, tstr, metype
+    
+    sprint( ncsFile, "%s/start.ncs", $s1 )
+    
+    ncsIn = new File()
+    {ncsIn.ropen( ncsFile )}
+    
+    if( !ncsIn.isopen ) {
+        printf ( "Failed to open ncs file %s/start.ncs\n", $s1 )
+        quit()
+    }
+    
+    $o2 = new Vector()
+    $o3 = new List()
+    
+    ncsIn.gets(tstr) //skip comment 
+    ncsIn.gets(tstr) //Cells x
+    sscanf(tstr, "%*s %d", &cellCount )	//parse out cell count
+
+    ncsIn.gets(tstr) // skip the '{'    
+    for i=0, cellCount-1 { // significantly improvable
+       
+        ncsIn.gets(tstr)
+        if (sscanf(tstr, " a%d %*d %*d %*s %s", &gid, metype ) != 2) {
+            {sprint(tstr, "error in %s format: %s", "start.ncs", tstr)}
+            print tstr
+            execerror(tstr)
+        }
+        
+        $o2.append(gid)
+        $o3.append( new String(metype) )
+        
+    }
+    
+    ncsIn.close
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Helper function which loads the template into NEURON and returns the name of the template.  The
+ * template name will be slightly different from the file name because the file name contains hyphens
+ * from the morphology instance (e.g. R-C261296A-P1_repaired) but hyphens must not appear in template names.
+ * The actual template name will have any hyphens replaced with underscores.
+ *
+ * @param $o1 Full path to template file or just the metype path
+ * @param $o2 if only the metype path is given for arg 1, then this must contain the metype as it appears in start.ncs
+ * @return The name of the template as it appears inside the file (sans hyphens)
+ */
+obfunc loadTemplate() { local scanCount  localobj templatePath, templateReader, templateLine, templateName
+
+// start.ncs gives metype names with hyphens, but the templates themselves
+// have those hyphens replaced with underscores.  This is because the programming
+// environment cannot have object types with non-standard charatcters (only [a-zA-Z0-9_])
+// I could try to do the character substitutions myself in NEURON, but string operations are difficult
+// instead, open the template file and read the name from the begintemplate line
+
+    if( numarg() == 2 ) {
+        templatePath = new String()
+        sprint ( templatePath.s, "%s/%s.hoc", $o1.s, $o2.s )
+    } else {
+        templatePath = $o1
+    }
+    
+    //first open the file manually to get the template name
+    templateReader = new File()
+    templateReader.ropen( templatePath.s )
+    
+    if( templateReader.isopen == 0) {
+        print "Error : Could not open template file :[", templatePath.s,"]"
+        execerror("Error : Could not open target file :[%s]", templatePath.s)
+    }
+    
+    templateLine = new String()
+    scanCount = 0
+    while( !templateReader.eof() && scanCount == 0 ) {
+        templateReader.gets( templateLine.s )
+        templateName = new String()
+        scanCount = sscanf( templateLine.s, "begintemplate %s", templateName.s )
+    }
+    templateReader.close()
+    
+    //now load the template normally with neuron
+    {load_file(templatePath.s)}
+    
+    return templateName
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * If our map has only been using numeric keys, then we can use a binary search to find the associate item.
+ * If we can have duplicate numeric keys in a map, then this will break.
+ *
+ * @param $1 gid for which we are searching
+ * @return metype, or nil if not found
+ */
+obfunc findMEType() { local low, high, mid, key  localobj nil
+    
+    low = 0
+    high = gidIndexed.size()
+    key = $1
+    
+    while ( low < high ) {
+        mid = int(( low+high)*0.5 )
+        
+        if( key > allgid.x[ gidIndexed.x[mid] ] ) { // must guess again, lower
+            low = mid+1
+        } else {
+            high = mid
+        }
+    }
+    
+    if( high < gidIndexed.size() ) {
+        if( allgid.x[ gidIndexed.x[low] ] == key ) {  //found
+            return allmetype.o( gidIndexed.x[low] )
+        }
+    }
+    
+    return nil
+}
+
+endtemplate BasicCellLoader
+

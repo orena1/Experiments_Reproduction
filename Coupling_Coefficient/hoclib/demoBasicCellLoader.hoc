@@ -1,0 +1,14 @@
+//demoBasicCellLoader
+
+{load_file( "BasicCellLoader.hoc" )}
+
+objref cellLoader
+
+// BlueConfig which has paths to the morphologies, metypes, circuit, etc
+cellLoader = new BasicCellLoader( "BlueConfig" )
+
+// instantiate gid X
+objref cell
+cell = cellLoader.createCell( 4567 )
+
+// do something with that cell

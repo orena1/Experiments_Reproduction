@@ -1,0 +1,58 @@
+Run Default
+{
+   MorphologyPath /gpfs/bbp.cscs.ch/project/proj55/oreilly/releases/2018-04-19/morph_release/
+   METypePath   /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/modelmanagement/2018-06-07/output/emodels_hoc_fix/
+   MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/modelmanagement/2018-06-07_isearch/output_megate/mecombo_emodel.tsv
+
+      CircuitPath /gpfs/bbp.cscs.ch/project/proj55/oreilly/releases/2018-04-19
+          nrnPath /gpfs/bbp.cscs.ch/project/proj55/oreilly/releases/2018-04-19/connectome/functional
+  CellLibraryFile circuit.mvd3
+
+        BaseSeed 360819
+
+	CurrentDir /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2018-10-24/depolarizations/depolarization200p0/Ca2p0/targetRt_RC/seed360819
+      OutputRoot /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2018-10-24/depolarizations/depolarization200p0/Ca2p0/targetRt_RC/seed360819
+      #TargetFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2018-10-24/depolarizations/depolarization200p0/Ca2p0/targetRt_RC/seed360819/user.target
+
+
+      	RunMode LoadBalance
+    CircuitTarget Mosaic
+         Duration 7000
+               Dt 0.025
+	 ForwardSkip 5000
+}
+
+
+
+
+Projection gapjunction
+{
+    # can use absolute path
+    # Path gap_junctions
+    Path /gpfs/bbp.cscs.ch/project/proj2/circuits/create_GJs_cons/thalamus/gap-junctions_0um/
+    #Path /gpfs/bbp.cscs.ch/project/proj2/matwolf/gj_test_0µm_v2/
+    Type GapJunction
+    Source Non
+}
+
+
+
+
+Reports
+
+Stimulus hypamp
+{
+        Mode Current
+  Pattern Hyperpolarizing
+        Delay 0.0
+  Duration 10000000.0
+}
+
+StimulusInject hypamp_mosaic
+{
+        Stimulus hypamp
+        Target Mosaic
+}
+
+OptStim
+

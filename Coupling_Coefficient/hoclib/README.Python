@@ -1,0 +1,38 @@
+
+
+Running BGLib controlled by python
+==================================
+
+Abstract: A HOWTO for using Python as the top-level control for BGLib, instead of HOC.
+
+Benefits: init.py supports specifying the BlueConfig at the command line, so it is more flexible for multiple simulations 
+than init.hoc.  Other benefits coming from the ability to integrate with the eco-system of modules available for python
+are forseen in the near future.
+
+Author:  Eilif Muller
+
+
+Get & Install mpi4py:
+---------------------
+
+Got tar ball: http://mpi4py.googlecode.com/files/mpi4py-1.2.2.tar.gz
+
+#setenv LD_LIBRARY_PATH /bgsys/drivers/ppcfloor/gnu-linux/lib/ 
+export LD_LIBRARY_PATH=/bgscratch/bbp/simulators/libraries/hdf5/lib:/bgsys/drivers/ppcfloor/gnu-linux/lib/
+/bgsys/drivers/ppcfloor/gnu-linux/bin/python setup.py build
+# NB: install to a prefix on bgscratch to drastically improve import times on the Blue Gene
+/bgsys/drivers/ppcfloor/gnu-linux/bin/python setup.py install --prefix=/bgscratch/bbp/ebmuller/opt
+
+You might also want to install numpy in a similar fashion.
+
+
+
+Running a simulation using init.py
+----------------------------------
+
+
+export LD_LIBRARY_PATH=/bgscratch/bbp/simulators/libraries/hdf5/lib:/bgsys/drivers/ppcfloor/gnu-linux/lib/
+export PYTHONPATH=/bgscratch/bbp/ebmuller/opt/lib/python2.6/site-packages
+
+
+mpirun -partition R02-M0 -np 2048 -mode VN -nofree -exe powerpc64/special -args "-python -NFRAME 256 init.py ./Control_1x2/BlueConfig" -exp_env HOME -exp_env PYTHONPATH 2>&1 | tee Control_1x2/sim1_stdout_stderr.txt

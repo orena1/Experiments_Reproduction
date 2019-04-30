@@ -1,0 +1,200 @@
+#!/usr/bin/perl
+use Text::ParseWords;
+use Switch;
+use Cwd;
+
+
+sub CheckPartition{
+    $Partition = $_[0];
+    $output=`rsh bg-sn01 partstatus_be $Partition`;
+    #print "output = $output \n";
+    $status=`echo "$output" | grep status` ;
+    @lst = &shellwords($status);
+    #print "here is :  [@lst[1]] \n";
+    $status = @lst[1];
+    if($status eq "F"){
+        return 0;
+    }else {
+        return 1;
+   }
+}
+
+# 1 = noallocate (already allocated to you)
+# 2 = nofree (not allocated and free for you)
+# 3 = partiton is busy with otheruser
+sub getStatus{
+    $Partition = $_[0];
+    $status = `rsh bg-sn01 getBlockInfo $Partition | grep FAIL`;
+    $len = length($status);
+    #print "Staus = [$status] [$len]\n";
+    if($len>0) {
+       if(CheckPartition($Partition)) {
+             return 3;
+       } else {
+             return 2;
+       }
+    }else {
+        return 1;
+   }
+}
+
+sub getAllocationOption{
+    $pstatus  = getStatus($Partition);
+    if($pstatus == 1) {
+        $allocOption= " -noallocate ";
+    }
+    if($pstatus == 2) {
+        $allocOption= " -nofree ";
+    }
+    if($pstatus == 3) {
+        print "Error : Partition[$Partition] is already in use.. check another partition. \n";
+        exit;
+    }
+    return $allocOption;
+}
+
+
+if ((@ARGV < 6)) {
+    print "Usage: bal <BlueConfig> <partition> <np> <WC(1)> <StartOption> <ProspectiveHosts>\n";
+    print "Usage: bal <BlueConfig> <partition> <np> <MS(2)> <StartOption> <ProspectiveHosts>\n";
+    print "       StartOption 1 To Calculate Mechanism complexity\n";
+    print "                   2 To Calculate Cell Complexity\n";
+    print "                   3 To Calculate balance info\n";
+    print "                   4 To Use load balance  info\n";
+    exit;
+}
+$usrTargetFile = `grep TargetFile BlueConfig`;
+@lst =  &shellwords($usrTargetFile);
+$usrTargetFile = @lst[-1];
+
+if(! -e $usrTargetFile){
+        print "UserTarget File not found : Creating default...";
+        $str  = `echo -e "Target Compartment AllCompartments\n{\n   Column\n}\n" > $usrTargetFile`;
+}
+
+
+$ConfigFile =$ARGV[0];
+$Partition  =$ARGV[1];
+$np         =$ARGV[2];
+$cwd        =getcwd;
+$exec       =sprintf("%s/powerpc64/special",$cwd);
+$balMode    =$ARGV[3]; #WC = 1,  MS =2 
+$WC	    = 1;
+$MS	    = 2;
+
+#$allocOption=getAllocationOption($Partition);
+#$pstatus  = getStatus($Partition);
+#if($pstatus == 1) {
+#    $allocOption= " -noallocate ";
+#}
+#if($pstatus == 2) {
+#    $allocOption= " -nofree ";
+#}
+#if($pstatus == 3) {
+#   print "Error : Partition[$Partition] is already in use.. check another partition. \n";
+#   exit;
+#}
+
+if (@ARGV > 4) {
+    $Step = $ARGV[4];
+}else {
+    $Step = 1;
+}
+
+if (@ARGV > 5) {
+    $ProspectiveHosts = $ARGV[5];
+}else {
+    $ProspectiveHosts = 1;
+}
+
+
+if(! -e $ConfigFile){
+    system("upsim $ConfigFile");
+}
+if('BlueConfig' ne $ConfigFile){    
+    system("cp $ConfigFile BlueConfig");
+}
+
+
+if($balMode == $WC){
+    print "In Whole cell mode\n";
+    switch ($Step){
+    	case 1 { print "Step 1. Calculating Mechanism complexity\n"; 
+	         $allocOption=getAllocationOption($Partition);
+	         $cmd = "mpirun $allocOption  -partition $Partition -np 1 -mode VN -cwd $cwd -exe $exec -env \"BLG_CHKPT_ENABLED=0\" -args \"mcomplex.hoc -NFRAME 256\">&bugMechComplexity"; 
+	         print "$cmd\n";
+                 system($cmd);
+                 next  }
+    	case [1,2] { print "Step 2. Calculating cell complexity\n"; 
+		`sed ' /default_var.*multisplit_/s/0/2/ \
+ /default_var.*makebal/s/0/1/  \
+ /default_var.*ProspectiveHosts/s/1/0/  \
+ ' parameterTemplate.hoc > parameter.hoc`;
+                 $allocOption=getAllocationOption($Partition);
+		 $cmd = "mpirun $allocOption  -partition $Partition -np $np -mode VN -cwd $cwd -exe $exec -env \"BLG_CHKPT_ENABLED=0\" -args \"init.hoc -NFRAME 256\">&buginitWCcx";
+	         print "$cmd\n";
+              system($cmd);
+		next }
+	case [1,2,3] { print "Step 3. Calculating balance info \n";
+		 `sed ' /default_var.*multisplit_/s/0/2/ \
+ /default_var.*ProspectiveHosts/s/1/$ProspectiveHosts/  \
+ ' parameterTemplate.hoc > parameter.hoc`;
+		$cmd = "/bglscratch/bbp/build/simulators/sneuron/nrn/powerpc64/bin/nrniv runbinfo.hoc";
+	         print "$cmd\n";
+		system($cmd); 
+		next;
+		}
+ 	case [4] { print "Step 4. Using Balance info in simulation\n";
+		`sed ' /default_var.*multisplit_/s/0/4/ ' parameterTemplate.hoc > parameter.hoc`;
+                $allocOption=getAllocationOption($Partition);
+                $cmd = "mpirun $allocOption  -partition $Partition -np $np -mode VN -cwd $cwd -exe $exec -env \"BLG_CHKPT_ENABLED=0\" -args \"init.hoc -NFRAME 256\">&buginitUse";
+	         print "$cmd\n";
+              system($cmd);
+                }    
+	}
+}
+
+if($balMode == $MS){
+    print "In MS cell mode\n";
+    switch ($Step){
+    	case 1 { print "Step 1. Calculating Mechanism complexity\n"; 
+                 $allocOption=getAllocationOption($Partition);
+                 $cmd = "mpirun $allocOption  -partition $Partition -np 1 -mode VN -cwd $cwd -exe $exec -env \"BLG_CHKPT_ENABLED=0\" -args \"mcomplex.hoc -NFRAME 256\">&bugMechComplexity";
+	         print "$cmd\n";
+                 system($cmd);
+                 next  }
+
+    	case [1,2] { print "Step 2. Calculating cell complexity\n"; 
+		 `sed ' /default_var.*multisplit_/s/0/2/ \
+ /default_var.*makebal/s/0/1/  \
+ /default_var.*ProspectiveHosts/s/1/$ProspectiveHosts/  \
+ ' parameterTemplate.hoc > parameter.hoc`;
+                 $allocOption=getAllocationOption($Partition);
+	         $cmd = "mpirun $allocOption  -partition $Partition -np $np -mode VN -cwd $cwd -exe $exec -env \"BLG_CHKPT_ENABLED=0\" -args \"init.hoc -NFRAME 256\">&buginitMScx";
+	         print "$cmd\n";
+                 system($cmd);
+                 next 
+	         }
+	case [1,2,3] { print "Step 3. Calculating balance info \n";
+		 `sed ' /default_var.*multisplit_/s/0/2/ \
+ /default_var.*makebal/s/0/1/  \
+ /default_var.*ProspectiveHosts/s/1/$ProspectiveHosts/  \
+ ' parameterTemplate.hoc > parameter.hoc`;
+	         $cmd = "/bglscratch/bbp/build/simulators/sneuron/nrn/powerpc64/bin/nrniv runbinfo.hoc";
+	         print "$cmd\n";
+                 system($cmd);        
+                 next
+                  }
+ 	case [4] { print "Step 4. Using Balance info in simulation\n";
+		 `sed ' /default_var.*multisplit_/s/0/2/  ' parameterTemplate.hoc > parameter.hoc` ;
+                  $allocOption=getAllocationOption($Partition);
+                  $cmd = "mpirun $allocOption  -partition $Partition -np $np -mode VN -cwd $cwd -exe $exec -env \"BLG_CHKPT_ENABLED=0\" -args \"init.hoc -NFRAME 256\">&buginitMSUse";
+	         print "$cmd\n";
+                  system($cmd);
+                 }
+     }
+}
+
+#$cmdstr = sprintf("%s","sed ' /default_var.*spike_compress/s/3/1/ ' parameterTemplate.hoc > parameter.hoc");
+#`sed ' /default_var.*spike_compress/s/3/1/ ' parameterTemplate.hoc > parameter.hoc`
+

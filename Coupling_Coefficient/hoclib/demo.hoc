@@ -1,0 +1,77 @@
+/**
+ * @file demo.hoc
+ * @brief 
+ * @author king
+ * @date 2009-06-12
+ * @remark Copyright © BBP/EPFL 2005-2011; All rights reserved. Do not distribute without further notice.
+ */
+
+//In place of init.hoc, use this to test things as they progress.
+// imports/loads
+
+{load_file( "nrngui.hoc" )}
+{load_file( "netparmpi.hoc" )}
+{load_file( "Node.hoc" )}
+{load_file( "ShowProgress.hoc" )}
+
+//objects for network creation
+objref cvode, sf
+
+objref node, progress
+
+//temp for debugging
+//sf = new StringFunctions()
+
+//sample bglib/bluebrain sequence
+//read BlueConfig
+
+//-----------------------------------------------------------------------------------------------
+//read Targets (start.target/user.target)
+//-----------------------------------------------------------------------------------------------
+
+node = new Node( "BlueConfig" )  //how can we parameterize string "BlueConfig" - need some variable that can be set
+  //another potential variable for the command line - ProspectiveHosts (or just use the mpi host count)
+
+{node.log( "load targets" )} //targets after initial load are the same regardless of load balancing
+{node.loadTargets()}
+
+{node.computeLB()}
+
+{node.log( "create model with load balancing" )}
+
+//-----------------------------------------------------------------------------------------------
+// create cells
+//-----------------------------------------------------------------------------------------------
+{node.createCells()}
+//sf.references( Cell[0] )
+
+//-----------------------------------------------------------------------------------------------
+// create connections
+//-----------------------------------------------------------------------------------------------
+{node.createSynapses()}
+
+//-----------------------------------------------------------------------------------------------
+// use targets
+//-----------------------------------------------------------------------------------------------
+
+//we're going to have separate objects handling stimulus instantiation.  should they do it out here, or within
+// the Node object?  Should both options be available to the user?  The Node object handles declared stims in the BlueConfig
+// but the user has the option to create stims separately?
+
+//create stims
+{node.log( "Enable Stimulus" )}
+{node.enableStimulus()}
+
+//create reports
+{node.log( "Enable Reports" )}
+{node.enableReports()}
+
+//run
+{node.log( "run" )}
+progress = new ShowProgress( cvode, node.myid )
+{node.prun()}
+
+//clean up and exit
+{node.log("simulation finished.  cleaning up.")}
+{node.cleanup()}
+quit()

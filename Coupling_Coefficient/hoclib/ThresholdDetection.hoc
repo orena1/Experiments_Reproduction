@@ -1,0 +1,338 @@
+/**
+ * @file ThresholdDetection.hoc
+ * @brief Reimplement ThresholdDetection algorithm in bglib1.5, using only basic cell creation and stimulus applications 
+ * @author king
+ * @date 2010-03-10
+ * @remark Copyright © BBP/EPFL 2005-2011; All rights reserved. Do not distribute without further notice.
+ */
+
+{load_file("nrngui.hoc")}
+{load_file("netparmpi.hoc")}
+{load_file("timeit.hoc")}
+
+{load_file("ConfigParser.hoc")}
+{load_file("TStim.hoc")}
+{load_file("Cell.hoc")}
+
+/**
+ * A ThresholdDetector object is used to evaluate one metype to find an appropriate threshold current.
+ * It instantiates a cell on creation and in the exec function it iterates through multiple simulations
+ * to zero-in on the current values using a binary search.
+ */
+begintemplate ThresholdDetector
+
+public init, exec, writeUpdatedCCell, enableDebugging, clear
+objref sourceCell, stim, hypstim, this, parsedRun
+strdef meFileName
+
+external tstop, run
+
+//for debugging
+objref somaVolt, somaTime, traceFile
+
+//-----------------------------------------------------------------------------------------------
+// Member function implementations
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * @param $o1 Run data - Map containing run field/value pairs
+ * @param $s2 meFileName - name of the file containing the metype
+ * @param $s3 meTypeName - name of metype used for instantiation (may be different from file)
+ */
+proc init() {
+    strdef tstr
+    
+    parsedRun = $o1
+    meFileName = $s2
+    
+    // note - filename can have special character: '-', '.', '(', ')'
+    // but the template name will have converted these to underscores: '_'
+
+    //load template
+    {sprint( tstr, "%s/%s.hoc", parsedRun.get( "METypePath" ).s, $s2 )}
+    {load_file(tstr)}
+    
+    // instantiate instance
+    {sprint( tstr, "sourceCell = new %s(1, \"%s/ascii\")", $s3, parsedRun.get( "MorphologyPath" ).s )}
+    {execute( tstr, this )}
+    
+    //add NEURON's built-in mechanism that can track number of AP events
+    access sourceCell.CellRef.soma
+    sourceCell.CellRef.APC =  new APCount(0.5)
+    sourceCell.CellRef.APC.thresh = -30
+
+    // insert stim object - we will vary the amp over several iterations
+    stim = new TStim(0.5)
+    hypstim = new TStim(0.5)
+    
+    verbose = 0
+    I = 0
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * When running simuations, time and voltage vectors can be built and output after each iteration
+ * 
+ * $param @o1 cvode object which accepts the vectors to be populated by time and voltage values during simulation
+ */
+proc enableDebugging() {  localobj cvode
+    cvode = $o1
+    
+    access sourceCell.CellRef.soma
+    
+    somaVolt = new Vector()
+    somaTime = new Vector()
+    cvode.record(&v(0.5), somaVolt, somaTime)
+    
+    verbose = 1
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Run the cell for several iterations, trying to find a minimum current (I) which causes one and only one spike
+ * $1 useHypAmp Indicates that if the cell has a hypamp current available, to inject it during execution
+ */
+proc exec() { local iteration, lastIwithAP, Imin, Imax, nAP, useHypAmp, ret
+    strdef tstr
+    useHypAmp = $1
+    
+    //set global NEURON variables
+    tstop = 7000
+    dt = 0.025
+    
+    // does the cell have a getHypAmp function?  are we supposed to use it?
+    if( useHypAmp ) {
+        // attempt to access the hypamp function
+        ret = execute1( "{getHypAmp()}", sourceCell, 0 )
+        if( ret != 0 ) { //we would get a non-zero if the function could successfully be called
+            if( verbose==1 ) {
+                print "Applying hyperpolarization current of ", sourceCell.getHypAmp()
+            }
+            hypstim.pulse( 0, 3000, sourceCell.getHypAmp() )
+        }
+    }
+    
+    lastIwithAP = 0
+    nAP   = 0
+    Imin = 0
+    Imax = 2
+    
+    iteration = 0
+    while( (abs(I - ((Imin + Imax)/2)) > 0.001) ) {    
+    
+        I = (Imin + Imax)/2
+
+        // reset the stimulus amp value and the count of APs 
+        stim.pulse( 2000, 1000, I )
+        sourceCell.CellRef.APC.n = 0
+        
+        if( verbose==1 ) {
+            print "Running ", meFileName," ............"
+        }
+        run() //invoke NEURON's solver
+
+        // print some info
+        nAP = sourceCell.CellRef.APC.n
+        if( verbose==1 ) {
+            print sourceCell, "No of action potentials are : ", nAP,  " for I = ", I,  " min =  ", Imin, " max = ", Imax
+        }
+        
+        if(nAP > 0){
+            Imax = I 
+            lastIwithAP = I
+        }else {
+            Imin = I
+        }
+
+        // save traces to help with debugging
+        if( verbose == 1 ) {
+            sprint( tstr, "%d.thresholdTrace.txt", iteration )
+            traceFile = new File( tstr )
+            traceFile.wopen()
+            
+            for i=0, somaVolt.size()-1 {
+                traceFile.printf( "%f %f\n", somaTime.x[i], somaVolt.x[i] )
+            }
+        }
+            
+        iteration = iteration+1
+    }
+    
+    // If our last iteration(s) didn't producea a spike, go back to the last current which did
+    if( lastIwithAP != I ) {
+        I = lastIwithAP
+    }
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Given the cell has a reasonable threshold current, create a new CCell file filling in the
+ * computed value into the appropriate line.
+ */
+proc writeUpdatedCCell() {  local lineIndex  localobj srcFile, lines, oFile, strObj
+    strdef tstr
+    
+    strObj = new StringFunctions()
+    
+    if( I == 0 ) {
+        //never spiked - don't write file
+        print "Ineffective combination - should be removed\n"
+    }else {
+        srcFile = new File()
+        sprint(tstr, "%s/%s.hoc", parsedRun.get( "METypePath" ).s, meFileName)
+        srcFile.ropen(tstr)    
+        
+        //read all lines into memory before writing file so we can do an inplace edit if necessary
+        lines = new List()
+        while(srcFile.gets(tstr)> -1){
+            lines.append( new String( tstr ) )
+        }
+        
+        srcFile.close()
+        
+        oFile = new File()
+        sprint(tstr,"%s/%s.hoc", parsedRun.get( "OutputRoot" ).s, meFileName)
+        oFile.wopen(tstr)
+        
+        //for each line read from the source file, copy it to the destination file
+        // unless it deals with threshold - then spit out an updated line for the computed value
+        for lineIndex=0,lines.count-1 {
+            if(strObj.substr( lines.o(lineIndex).s, "func getThreshold()") < 0) {
+                oFile.printf( "%s", lines.o(lineIndex).s )
+            } else {
+                oFile.printf( "\nfunc getThreshold(){return (%lf) }\n", I )
+            }
+        }
+        
+        oFile.close()
+    }
+}
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Removes object references to the modeled cell so that it can be deleted and memory reclaimed
+ */
+proc clear() { localobj nil
+    sourceCell.CellRef.clear()
+    sourceCell = nil
+}
+
+endtemplate ThresholdDetector
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * Utility function to check if some values were overridden on the command line
+ *
+ * e.g. nrngui -c varname=value HypAmpSearch.hoc
+ *
+ * @param $s1 name of variable to test
+ * @param $2  default value to give 
+ */
+proc default_var() {localobj s
+	if (name_declared($s1) == 0) {
+		s = new String()
+		hoc_ac_ = $2
+		sprint(s.s, "%s = hoc_ac_", $s1)
+		execute(s.s)
+	}
+}
+
+//-----------------------------------------------------------------------------------------------
+// Main Program: outer loop over all metypes in need of threshold detection
+//-----------------------------------------------------------------------------------------------
+
+// check for parameter overrides ( given to program as -c 'var=val'
+default_var( "useHypAmp", 1 )
+
+objref configParser
+configParser = new ConfigParser()
+{configParser.open( "BlueConfig" )}
+
+//firstCall = 1
+
+/**
+ * callback function usabel by pc.submit.  Creates a ThresholdDetection object for a given metype/CCell and executes it
+ *
+ * @param $s1 filename
+ * @param $s2 template name
+ * @param $3 useHypAmp
+ * @param $3 verbose on(1) or off(0)
+ */
+func tdBundle() { local useHypAmp, isVerbose  localobj tdRunner, sf
+    useHypAmp = $3
+    isVerbose = $4
+
+    /*
+    if( firstCall ) {
+        firstCall = 0
+    } else {
+        sf = new StringFunctions()
+        sf.references( Cell[0] )
+    }*/
+    
+    tdRunner = new ThresholdDetector( configParser.parsedRun, $s1, $s2 )
+        
+    //let node 0 print out every tenth cell assigned to it
+    if( isVerbose==1 ) {
+        tdRunner.enableDebugging( cvode )
+    }
+    
+    timeit_start(evalID)
+    tdRunner.exec( useHypAmp )
+    timeit_add(evalID)
+    
+    tdRunner.writeUpdatedCCell()
+    tdRunner.clear()
+    
+    return 1
+}
+
+strdef metypeLine, fileName, templateName
+objref fi
+
+objref pc
+pc = new ParallelContext()
+
+timeit_init(pc)
+if( pc.id() == 0 ) {
+    timeit_setVerbose(1)
+}
+evalID = timeit_register("evalcell")
+
+//turn on variable imestep method for faster processing
+objref cvode
+cvode = new CVode()
+{cvode_active(1)}
+
+{pc.runworker}
+
+//only the master cpu reaches here.  submit jobs for the workers to do
+
+//get list of metypes we need to instantiate and simulate
+fi = new File()
+{fi.ropen("metypeList.txt")}
+
+//first line has number of metypes that will appear on remaining lines
+n = 0
+{fi.gets(metypeLine)}
+{sscanf(metypeLine, "%d", &n)}
+
+//for each metype (line), run another hoc file that does the Threshold detection
+for i=0, n-1 {
+    {fi.gets(metypeLine)}
+    {sscanf(metypeLine, "%s %s", fileName, templateName)}
+    
+    pc.submit( "tdBundle", fileName, templateName, useHypAmp, 0 )
+}
+while( pc.working) {
+}
+
+prtime()
+
+pc.done()
+quit()

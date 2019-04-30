@@ -1,0 +1,101 @@
+//execute1("celltypes.element(\"PC\")")
+
+load_file("subiter.hoc")
+
+begintemplate PC
+public init, topol, basic_shape, subsets, geom, biophys, geom_nseg, biophys_inhomo
+public synlist, x, y, z, position, connect2target
+
+public soma, dend, apic, axon
+public all, somatic, apical, axonal, basal
+
+objref synlist
+objref all, somatic, apical, axonal, basal
+
+proc init() {
+	all = new SectionList()
+	somatic = new SectionList()
+	basal = new SectionList()
+	apical = new SectionList()
+	axonal = new SectionList()
+    subsets()
+    synlist = new List()
+    synapses()
+    x = y = z = 0 // only change via position
+    forall delete_section()
+}
+
+create soma[1], dend[1], apic[1], axon[1]
+
+
+proc subsets() { local i
+  objref all, somatic, apical, axonal, basal
+  all = new SectionList()
+//    soma all.append()
+//    dend all.append()
+//    apic all.append()
+//    axon all.append()
+
+  somatic = new SectionList()
+//    soma somatic.append()
+
+  apical = new SectionList()
+//  apic apical.append()
+
+  axonal = new SectionList()
+//  axon axonal.append()
+
+  basal = new SectionList()
+//  dend basal.append()
+
+}
+proc geom() {
+  forsec all {  L = 100  diam = 1  }
+}
+external lambda_f
+proc geom_nseg() {
+  soma area(.5) // make sure diam reflects 3d points
+  forsec all { nseg = int((L/(0.1*lambda_f(100))+.9)/2)*2 + 1  }
+}
+
+proc soma_resize()      {
+        forsec "soma"   {
+        if (area(0.5) > 600)    {
+                if (L > 20) L = 20
+                if (diam > 10) diam = 10
+
+        }
+        }
+}
+
+proc biophys() {
+    access soma
+    area(0.5)       //Hack for bug in import3d : Necessary Otherwise diam will not get updated.
+    forsec all {
+    Ra = 80
+    cm = 1
+    insert hh
+      gnabar_hh = 0.12
+      gkbar_hh = 0.016
+      gl_hh = 0.0003
+      el_hh = -54.3
+  }
+}
+objref apical_x
+proc biophys_inhomo() {
+  // Path Length from root with no translation
+  //   and no normalization ranges from 0 to 0
+  apical_x = new SubsetDomainIterator(apical, 0, 0, 0)
+}
+proc position() { local i
+  soma for i = 0, n3d()-1 {
+    pt3dchange(i, $1-x+x3d(i), $2-y+y3d(i), $3-z+z3d(i), diam3d(i))
+  }
+  x = $1  y = $2  z = $3
+}
+proc connect2target() { //$o1 target point process, $o2 returned NetCon
+  soma $o2 = new NetCon(&v(1), $o1)
+  $o2.threshold = 10
+}
+proc synapses() {}
+endtemplate PC

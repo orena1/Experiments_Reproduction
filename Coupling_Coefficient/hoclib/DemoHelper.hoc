@@ -1,0 +1,63 @@
+/**
+ * @file DemoHelper.hoc
+ * @brief Encapsulate any hoc actions that are necessary to instantiate this synapse type
+ * @author king
+ * @date 2015-04-16
+ * @remark Copyright © BBP/EPFL 2005-2015; All rights reserved. Do not distribute without further notice.
+ */
+
+// global that is shared/accessible from Demo2Helper objects
+// Note that a name should be chosen that should not be used for any other global.  Otherwise may cause strange behavior
+objref synapseReaderDemoHelper
+
+/**
+ * Example Helper object to illustrate a simple override to synapse type to an inhibitory type
+ */
+begintemplate DemoHelper
+
+objref synapse, rng
+public synapse
+
+external synapseReaderDemoHelper
+
+/**
+ * @param tgid gid of Postsynaptic cell
+ * @param synParameters set of paramters loaded from default nrn.h5
+ * @param x location of the synapse along the section (0<=x<=1)
+ * @param synapseID id assigned to this synapses within the cell's context
+ * @param baseSeed for random number generator
+ */
+proc init() { local tgid, x, synapseID, baseSeed  localobj synParams
+    
+    tgid = $1
+    synParams = $o2
+    x = $3
+    synapseID = $4
+    baseSeed = $5
+    
+    synapse = new ProbGABAAB_EMS(x)
+    
+    if( object_id( synapseReaderDemoHelper, 1 ) == -1 ) {
+        synapseReaderDemoHelper = new Vector()
+    }
+    synapseReaderDemoHelper.append( synapseID )
+    //print synapseReaderDemoHelper, " ", synapseReaderDemoHelper.size(), " ", synapseReaderDemoHelper.x[0], " ", synapseReaderDemoHelper.x[synapseReaderDemoHelper.size()-1]
+    
+    rng = new Random()
+    rng.MCellRan4( synapseID*100000+100, tgid+250+baseSeed )
+    rng.lognormal(0.2, 0.1)
+    synapse.tau_r_GABAA = rng.repick()
+    synapse.tau_d_GABAA = synParams.DTC
+    
+    synapse.Use = abs( synParams.U )
+    synapse.Dep = abs( synParams.D )
+    synapse.Fac = abs( synParams.F )
+    
+    rng = new Random()
+    rng.MCellRan4( synapseID*100000+100, tgid+250+baseSeed )
+    rng.uniform(0,1)
+    synapse.setRNG( rng )
+    synapse.synapseID = synapseID
+}
+
+endtemplate DemoHelper

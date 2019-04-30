@@ -1,0 +1,21 @@
+Notes on migrating to bglib1.5
+
+-Only mods which are new or have been modified are included in the bglib1.5 branch
+--Check out the modlib from the blubrain trunk and replace copy bglib1.5 mods into it
+
+-For the METypePath field in the BlueConfig, the directory referenced should containg the new CCells
+--Typically, this can be done by changing the last directory name from 'metypes' to 'CCells'
+--e.g. METypePath /bgscratch/bbp/release/29.03.10/CCells
+
+For those who had branched off bglib1.5 earlier, the following files were modified when renaming LoadBalance.hoc to CellDistributor.hoc
+
+Node.hoc
+LoadBalance.hoc -> CellDistributor.hoc (with internal edits, too)
+Target.hoc
+TargetManager.hoc
+SynapseRuleManager.hoc
+
+
+Documentation notes:
+In preparation for bglib_1.6, addition of doxygen templates and documentation.
+Please define in bglib root directory the following environment variable: BGLIB_ROOT by using export BGLIB_ROOT=$PWD or setenv BGLIB_ROOT $PWD 

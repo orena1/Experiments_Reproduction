@@ -1,0 +1,28 @@
+//This hoc file is used in place of import3d.hoc to batch load the multiple used for handling the loading of morphology files
+
+// these files should be taken from the latest NEURON repo, but since they are relative to the shared hoc dir, we will use neuronhome() to
+// build the full path
+objref import3dFileList
+import3dFileList = new List()
+import3dFileList.append( new String("import3d_sec.hoc") )
+import3dFileList.append( new String("read_swc.hoc") )
+import3dFileList.append( new String("read_nlcda.hoc") )
+import3dFileList.append( new String("read_nlcda3.hoc") )
+import3dFileList.append( new String("read_nts.hoc") )
+import3dFileList.append( new String("read_morphml.hoc") )
+
+for fileIndex=0, import3dFileList.count()-1 {
+    sprint( import3dFileList.o(fileIndex).s, "%s/lib/hoc/import3d/%s", neuronhome(), import3dFileList.o(fileIndex).s )
+    {load_file(import3dFileList.o(fileIndex).s)}
+}
+
+// This is a modified version of import3d/import3d_gui.hoc
+// It disables contour2centroid for soma sections
+{load_file("import3d_gui_outline.hoc")}
+
+objref tobj, nil
+proc makeimport3dtool() {
+	tobj = new Import3d_GUI(nil)
+	tobj = nil
+}
+

@@ -1,0 +1,113 @@
+/**
+ * @file showMechanisms.hoc
+ * @brief 
+ * @author king
+ * @date 2009-06-12
+ * @remark Copyright © BBP/EPFL 2005-2011; All rights reserved. Do not distribute without further notice.
+ */
+
+//In place of init.hoc, build the cells and synapses, then count the mechanisms used
+
+// imports/loads
+{load_file( "nrngui.hoc" )}
+{load_file( "netparmpi.hoc" )}
+{load_file( "Node.hoc" )}
+{load_file( "ShowProgress.hoc" )}
+
+//objects for network creation
+objref cvode
+objref node, progress
+
+//read BlueConfig - default is "BlueConfig" unless the strdef variable 'configFile' is set at the global level
+configOverride = name_declared("configFile")
+if (configOverride == 4) {  //is a strdef, we can use that
+    node = new Node( configFile )
+} else {
+    if (configOverride != 0) {  //var is declared, but unhandled type: objref, scalar, or section; print a warning
+        // Note: I don't have the parallel net manager yet, and I don't want to print ncpu messages.  Defer the warning until later
+        warn = 1
+    }
+    node = new Node( "BlueConfig" )
+
+    if( warn ) {
+        node.log( "Warning: variable 'configFile' declared, but not as strdef.  Using default \"BlueConfig\"" )
+    }
+}
+
+//-----------------------------------------------------------------------------------------------
+//read Targets (start.target/user.target)
+//-----------------------------------------------------------------------------------------------
+
+{node.log( "load targets" )} //targets after initial load are the same regardless of load balancing
+{node.loadTargets()}
+
+{node.computeLB()}
+
+{node.log( "create model for simulation" )}
+
+//-----------------------------------------------------------------------------------------------
+// create cells
+//-----------------------------------------------------------------------------------------------
+{node.createCells()}
+
+// Apply any cell value overrides as defined by user in BlueConfig
+{node.executeNeuronConfigures()}
+
+//-----------------------------------------------------------------------------------------------
+// create connections
+//-----------------------------------------------------------------------------------------------
+{node.createSynapses()}
+
+
+// network created, begin summing the instances of the various mechanisms and point processes
+
+objref gidvec, cellobj, mechtype, usevec, ptype, activeProcess, pvec
+
+gidvec = node.cellDistributor.getGidListForProcessor()
+
+mechtype = new MechanismType(0)
+ptype = new MechanismType(1)
+strdef mname
+
+usevec = new Vector(mechtype.count())
+pvec = new Vector(ptype.count())
+
+for gidIndex=0, gidvec.size()-1 {
+    cellobj = node.cellDistributor.getCell(gidvec.x[gidIndex])
+    print cellobj
+
+    forsec cellobj.all {
+        for i=0, mechtype.count()-1 {
+            mechtype.select(i)
+            mechtype.selected(mname)
+
+            if( ismembrane(mname) ) {
+                 //print secname(), " has ", mname
+                 usevec.x[i] = usevec.x[i]+1
+            }
+        }
+
+        for i=0, ptype.count()-1 {
+            ptype.select(i)
+            for( activeProcess=ptype.pp_begin(); object_id(activeProcess) != 0; activeProcess = ptype.pp_next() ) {
+                pvec.x[i] = pvec.x[i]+1
+            }
+        }
+    }
+}
+
+for i=0, usevec.size()-1 {
+    mechtype.select(i)
+    mechtype.selected(mname)
+    print mname, " ", usevec.x[i]
+}
+
+for i=0, pvec.size()-1 {
+    ptype.select(i)
+    ptype.selected(mname)
+    print mname, " ", pvec.x[i]
+}
+
+{node.cleanup()}
+quit()
+
