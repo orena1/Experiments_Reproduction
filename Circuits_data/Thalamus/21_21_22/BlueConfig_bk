@@ -1,0 +1,189 @@
+Run Default
+{
+    CircuitPath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22
+    nrnPath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22/connectome/functional/edges.h5
+    MorphologyPath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/morphology_release/2021-02-19
+    METypePath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/modelmanagement/2021-02-20/hoc
+    MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/modelmanagement/2021-02-20/mecombo_emodel.tsv
+    CellLibraryFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22/sonata/networks/nodes/All/nodes.h5
+    BioName /gpfs/bbp.cscs.ch/project/proj55/entities/bionames/O1v3_2020-02-22
+    Atlas /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/atlases/O1-323/
+
+    CurrentDir /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22/test-simulations/base-circuit/
+    OutputRoot /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22/test-simulations/base-circuit/
+
+    RunMode LoadBalance
+    CircuitTarget Rt_RC
+    Duration 3000
+    Dt 0.025
+    ForwardSkip 5000
+
+}
+
+Projection gapjunction
+{
+    Path  /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22/proj_gap-junctions
+    Type GapJunction
+}
+
+Report soma
+{
+    Target mc2_Column
+    Type compartment
+    ReportOn v
+    Unit mV
+    Format Bin
+    Dt 0.1
+    StartTime 0
+    EndTime 3000
+}
+
+
+# Spont minis
+# NB: Weights here are effectively ignored.  Weight is taken as that assigned to the synapse
+# after processing all subsequent (non-delayed) connection blocks.
+
+# Govindaiah & Cox, 2004 (IN->TC)
+Connection ConInh-Uni
+{
+        Source Inhibitory
+        Destination Mosaic
+        Weight 1.0
+	SpontMinis 0.025
+}
+
+Connection ConL3Exc-Uni
+{
+        Source Excitatory
+        Destination Mosaic
+        Weight 1.0
+        SpontMinis 0.025
+}
+
+
+# Adjust global synapse parameters, e.g. reversals
+# Zhu & Lo, 1999
+# Ulrich & Huguenard, 1996 for GABAB taus from text
+Connection GABAB_erev
+{
+	Source Inhibitory
+	Destination Mosaic
+	Weight 1.0
+	SynapseConfigure %s.e_GABAA = -82.0 %s.e_GABAB = -97.0 tau_d_GABAB_ProbGABAAB_EMS = 77
+}
+
+# Huguenard & Prince, 1994
+Connection GABA_erev_Rt_TC
+{
+	Source Rt_RC
+	Destination VPL_TC
+	Weight 1.0
+	SynapseConfigure %s.e_GABAA = -94.0 %s.e_GABAB = -97.0
+}
+
+# Cl- reversal is different in thalamus vs. Rt
+Connection GABA_erev_IN_TC
+{
+	Source VPL_IN
+	Destination VPL_TC
+	Weight 1.0
+	SynapseConfigure %s.e_GABAA = -94.0 %s.e_GABAB = -97.0
+}
+
+Connection MGGate
+{
+	Source Excitatory
+	Destination Mosaic
+	Weight 1.0
+	SynapseConfigure %s.mg = 1.0
+}
+
+# Use adjustments due to Calcium 2.0 mM compared to normal 2.0 mM
+
+#Connection scheme_CaUse_ee
+{
+              Source Excitatory
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+Connection scheme_CaUse_e_2_Other_Inh
+{
+              Source Excitatory
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+Connection scheme_CaUse_Other_Inh_2_e
+{
+              Source Inhibitory
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+Connection scheme_CaUse_Inh_Inh
+{       
+              Source Inhibitory
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 1.0
+}
+
+# Adjust AMPA_NMDA and GABAA_B ratios
+
+# Huguenard & Prince, 1994 (Rt->TC), 2.9/9.7
+Connection scheme1b
+{       
+              Source Inhibitory
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.GABAB_ratio = 0.0
+}
+
+# Ulrich & Huguenard, 1996 (Rt-Rt GABA_B ratio much smaller than in Rt-TC)
+Connection scheme2b
+{       
+              Source Inhibitory
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.GABAB_ratio = 0.0
+}
+
+# Zhu & Lo, 1999
+Connection Rt_IN_GABAB_ratio
+{       
+              Source Rt_RC
+         Destination VPL_IN
+              Weight 1.0
+    SynapseConfigure %s.GABAB_ratio = 0.0
+}
+
+# To re-evaluate, JY doesn't see GABAB, same result Warren et al. 2004
+Connection Rt_TC_GABAB_ratio
+{
+              Source Rt_RC
+         Destination VPL_TC
+              Weight 1.0
+    SynapseConfigure %s.GABAB_ratio = 0.0
+}
+
+Connection scheme_nmda_e2i
+{       
+              Source Excitatory
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.57
+}
+
+# Deleuze and Huguenard, 2016
+Connection TC_Rt_NMDA
+{       
+              Source VPL_TC
+         Destination Rt_RC
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.57
+}
+

@@ -1,0 +1,5 @@
+simwriter
+.directory
+.dropbox*
+*v_per_gid*
+*ipynb_checkpoints*

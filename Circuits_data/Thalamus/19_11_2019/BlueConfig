@@ -1,0 +1,62 @@
+Run Default
+{
+
+   MorphologyPath /gpfs/bbp.cscs.ch/project/proj82/home/iavarone/morphology_release/20191031/
+   METypePath   /gpfs/bbp.cscs.ch/project/proj82/home/iavarone/modelmanagement/20191105/memodels/hoc
+   MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj82/home/iavarone/modelmanagement/20191105/output_megate_dep/mecombo_emodel.tsv
+
+      CircuitPath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2019-11-19
+          nrnPath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2019-11-19/connectome/functional/edges.sonata
+  CellLibraryFile circuit.mvd3
+
+        BaseSeed 955325
+
+	#Simulator CORENEURON
+	RNGMode Random123
+
+	CurrentDir /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2019-11-21/gap-junctions_test_2
+      OutputRoot /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2019-11-21/gap-junctions_test_2
+      TargetFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2019-11-21/spindle_noTC2TC_testRt2RtGABABRatio/depolarization800p0/Rt2Rt_GABAB0p17/hold_level50p0/seed955325/user.target
+
+
+      	RunMode LoadBalance
+    CircuitTarget Rt_RC
+         Duration 1500
+               Dt 0.025
+	 ForwardSkip 5000
+}
+
+Projection gap-junctions
+{
+    Path /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2019-11-21/gap-junctions_test_2
+    Type GapJunction
+}
+
+Report soma
+{
+    Target Rt_RC
+    Type compartment
+    ReportOn v
+    Unit mV
+    Format Bin
+    Dt 0.1
+    StartTime 0
+    EndTime 4000
+}
+
+Stimulus ThresholdDepol
+{
+
+              Mode Current
+           Pattern Noise
+       MeanPercent 200.0
+          Variance 0.001
+             Delay 800.0
+          Duration 500.0
+}
+
+StimulusInject ThresholdDepolInj
+{
+        Stimulus ThresholdDepol
+        Target Rt_RC_r50
+}

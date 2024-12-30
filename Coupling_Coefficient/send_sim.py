@@ -24,7 +24,7 @@ Mg = float(1.0)
 
 
 
-change_gamma = True
+change_gamma = False
 core_neuron = False
 knl = False
 cluster = 'neuron_coreneuron' # bbpv1 # bbpviz1 # bbpv1core_neuron
@@ -47,13 +47,16 @@ if cluster == 'neuron_coreneuron':
         nodes = 55
         ntask_per_node = 64
     else:
-        nodes = 30
+        nodes = 11
         ntask_per_node = 36
-        
 
-def create_path_and_copy_file(path_for_simulations):
+
+
+
+def create_path_and_copy_file(path_for_simulations, model_folders):
     #model_folders = '../O1_v6_20171212/'
-    model_folders = '../Circuits_data/Hippocampus/20181114/'
+    #model_folders = '../Circuits_data/Hippocampus/20190306/'
+    #model_folders = '../Circuits_data/Thalamus/19_04_2018/'
     
     FilesToCopy = ['launchScript_bg_template.sh', 'inputs.dat', 'user.target', 'BlueConfig_template']
     if not os.path.exists(path_for_simulations):
@@ -88,7 +91,7 @@ def create_directory(base_path, settings):
         if settings['load_g_pas']==False:
             base_path += '_Load_g_pas_False'
         else:
-            base_path += '_Load_g_pas_True' + '_Correc_iter_load' + str(settings['currention_iteration_load']).replace('-1','last')
+            base_path += '_Load_g_pas_True' + '_Correc_iter_load' + str(settings['correction_iteration_load']).replace('-1','last')
         
         
         
@@ -111,13 +114,13 @@ def create_directory(base_path, settings):
     return(base_path)
 
 
-def create_current_injections(path_for_simulations):
+def create_current_injections(path_for_simulations, gids_to_test):
 
-    gids_to_test = [2011, 136577, 3121, 4782, 8077, 157388, 14559, 6150]
+    
 
     for gid in gids_to_test:
         f = open(path_for_simulations + 'user.target','a')
-        f.write('Target Cell a' + str(gid) + '\n{\n')
+        f.write('\nTarget Cell a' + str(gid) + '\n{\n')
         f.write('   a' + str(gid))
         f.write('\n}\n\n')
         f.close()
@@ -139,6 +142,83 @@ def create_current_injections(path_for_simulations):
     return(stim_vars, optogenetic_vars,simulation_duration)
 
 
+circuit_to_run = {'neocortex_v6':{},
+                  'hippocampus_06_03_2019':{'gids_to_test':[17068,16946,17062,17064,17068],
+                                             'base_path':'/gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions_v1/hippocampus/circ03_06_2019_v2/',
+                                             'circuit_target':'SP_PVBC_gjs',
+                                             'model_folders':'../Circuits_data/Hippocampus/20190306/',
+                                             'hoc_lib':'/gpfs/bbp.cscs.ch/home/amsalem/rsync/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/hoclib_hippocampus/',
+                                             'special_path':'$SPECIAL -mpi ',
+                                             'bbpviz_txt':'module load hpe-mpi\nmodule load python/3.6.5\nexport SPECIAL=/gpfs/bbp.cscs.ch/project/proj2/Programs/test/hippocampus/soft/sources/neurodamus/x86_64/special'
+                                                 
+                                             
+                                             
+                                                 }
+                  }
+
+
+def set_stages_settings():
+    stages_settings  = {'1_extract_holding_voltage':{'remove_channels':False,
+                                                    'procedure_type':'validation_sim',
+                                                    'remove_channels':'none',
+                                                    'stim_num':1,
+                                                    'stim_dur':1,
+                                                    'stim_isi':3000,
+                                                    'stim_amp':0.0000000001,
+                                                    'disable_holding',False,
+                                                    'gjc':0.0,
+                                                    'manual_MEComboInfoFile':False,
+                                                    'load_g_pas':False },
+                        '2_find_correct_holding':{'remove_channels':False,
+                                                    'procedure_type':'find_holding_current',
+                                                    'remove_channels':'none',
+                                                    'vc_amp':circuit_to_run[circ]['base_path'] +'/validation_sim/stim_amp1em10_stim_num1_stim_dur1_stim_isi3000/Circ' +  circuit_to_run[circ]['circuit_target'] + '_Remove_ch_none_Det_stoch_True_Dis_holding_False_gjc0p0_Change_mecomb_False_manual_MEComboInfoFile_False_Load_g_pas_False/num_0/v_per_gid.hdf5',
+                                                    'load_g_pas':circuit_to_run[circ]['base_path'] +'/rm_correction/Circ' +  circuit_to_run[circ]['circuit_target'] + '_Remove_ch_all_Det_stoch_True_Dis_holding_False_Correc_type_impedance_tool_Cm0p01_Num_iter_10/num_0/g_pas_passive.hdf5',
+                                                    'stim_num':1,
+                                                    'stim_dur':1,
+                                                    'stim_isi':3000,
+                                                    'stim_amp':0.0000000001,
+                                                    'disable_holding',False,
+                                                    'gjc':gjc,
+                                                    'manual_MEComboInfoFile':False,
+                                                    },
+                        '3_validation_sim_with_gj':{'remove_channels':False,
+                                                    'procedure_type':'validation_sim',
+                                                    'load_g_pas':circuit_to_run[circ]['base_path'] +'/rm_correction/Circ' +  circuit_to_run[circ]['circuit_target'] + '_Remove_ch_all_Det_stoch_True_Dis_holding_False_Correc_type_impedance_tool_Cm0p01_Num_iter_10/num_0/g_pas_passive.hdf5',
+                                                    'manual_MEComboInfoFile':circuit_to_run[circ]['base_path'] +'vc_ampFile/Circ_' + circuit_to_run[circ]['circuit_target'] + '_Remove_ch_none_Det_stoch_True_Dis_holding_False_gjc' + str(gjc) + ' _Change_mecomb_False_manual_MEComboInfoFile_False_Load_g_pas_True_Correc_iter_loadlast/num_0/holding_per_gid.hdf5'
+                                                    'remove_channels':'none',
+                                                    'stim_num':1,
+                                                    'stim_dur':100,
+                                                    'stim_isi':400,
+                                                    'stim_amp':150,
+                                                    'disable_holding',False,
+                                                    'gjc':gjc},
+                        '4_validation_sim_with_gj':{'remove_channels':False,
+                                                    'procedure_type':'validation_sim',
+                                                    'load_g_pas':False,
+                                                    'manual_MEComboInfoFile':False,
+                                                    'remove_channels':'none',
+                                                    'stim_num':1,
+                                                    'stim_dur':100,
+                                                    'stim_isi':400,
+                                                    'stim_amp':150,
+                                                    'disable_holding',False}
+                                                 
+    return(stages_settings)
+
+
+gjc = 0.2
+circ = 'hippocampus_06_03_2019'
+stages_settings = set_stages_settings()
+
+
+
+hoc_lib = circuit_to_run[circ]['hoc_lib']
+special_path = circuit_to_run[circ]['special_path']
+bbpviz_txt =circuit_to_run[circ]['bbpviz_txt']
+
+
+
 nice_level = 0    
 
 remove_spon_minis = False
@@ -146,6 +226,7 @@ Disable_CortoCortical = False
 DisableUseDep = False
 spike_replay = None
 projection_path = None
+gids_to_test = [17068,16946,17062,17064,17015]
 
 reports = {}
 v_clamp = {}
@@ -163,15 +244,15 @@ MEComboInfoFile = None
 
 
 for remove_channels in ['none']:
-    for load_g_pas in [False]:#'/gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions/test4.hdf5']:#,False]:
-        for gjc in [0.1]:
+    for load_g_pas in ['/gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions_v1/hippocampus/circ03_06_2019_v2/rm_correction/Circ_SP_PVBC_gjs_Remove_ch_all_Det_stoch_True_Dis_holding_False_Correc_type_impedance_tool_Cm0p01_Num_iter_10/num_0/g_pas_passive.hdf5']:#'/gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions/test4.hdf5']:#,False]:
+        for gjc in [0.2]:
             for MEComboInfoFile in [None]:#,'/gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/mecombo_emodel.tsv']:
 
                 settings = {}
-                settings['procedure_type'] = 'rm_correction' # 'rm_correction' | 'validation_sim' | 'find_holding_current'
+                settings['procedure_type'] = 'validation_sim' # 'validation_sim' | 'validation_sim' | 'find_holding_current'
                 settings['remove_channels'] = remove_channels#'all' #'only_stoch','only_non_stoch', 'none','all'
                 settings['determanisitc_stoch'] = True # True|False
-                settings['circuit_target'] = 'SP_PVBC' # PV_mc2 | Rt_RC_gjs | SP_PVBC
+                settings['circuit_target'] = circuit_to_run[circ]['circuit_target'] #SP_PVBC_gjs' # PV_mc2 | Rt_RC_gjs | SP_PVBC
                 settings['disable_holding'] = False # True|False
                 #settings['special_tag'] = '0as0p1'
 
@@ -186,8 +267,10 @@ for remove_channels in ['none']:
                     RunMode = 'RunMode WholeCell'
                 elif settings['procedure_type'] in ['validation_sim', 'find_holding_current']:
                     settings['load_g_pas'] = load_g_pas#'/gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions/test4.hdf5' # path to h5 file with g_pas values | False
-                    settings['manual_MEComboInfoFile'] = False#'/gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/holding_per_gid.hdf5' #False, '/gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/holding_per_gid.hdf5'
-                    settings['currention_iteration_load'] = -1
+                    settings['manual_MEComboInfoFile'] = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions_v1/hippocampus/circ03_06_2019_v2/find_holding_current/vc_ampFile/'\
+                         + 'Circ_SP_PVBC_gjs_Remove_ch_none_Det_stoch_True_Dis_holding_False_gjc0p2_Change_mecomb_False_manual_MEComboInfoFile_False_Load_g_pas_True_Correc_iter_loadlast/num_0/'\
+                             +'holding_per_gid.hdf5'#False#'/gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/holding_per_gid.hdf5' #False, '/gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/holding_per_gid.hdf5'
+                    settings['correction_iteration_load'] = -1
                     settings['gjc'] = gjc#0.1
                     reports['soma_voltage'] = {'REPORT_TARGET':settings['circuit_target'],'START_TIME':str(0), 'END_TIME':str(9e9),'DT':str(0.1)}
                     settings['change_MEComboInfoFile'] = None
@@ -197,26 +280,34 @@ for remove_channels in ['none']:
                     
                     if settings['procedure_type'] == 'validation_sim':
                         #settings['stim_num'] = 1
-                        #settings['stim_dur'] = 1
+                        #settings['stim_dur'] = 2
                         #settings['stim_isi'] = 3000
                         #settings['stim_amp'] = 0.0000000001
+                        RunMode = 'RunMode LoadBalance'
                         
                         settings['stim_num'] = 1
                         settings['stim_dur'] = 1000
                         settings['stim_isi'] = 400
-                        settings['stim_amp'] = 150
+                        settings['stim_amp'] = 149
                     if settings['procedure_type'] == 'find_holding_current':
-                        settings['vc_amp'] = '/gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/v_per_gid.hdf5'  #''/gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/v_per_gid.hdf5' | -84
+                        settings['vc_amp'] = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions_v1/hippocampus/circ03_06_2019_v2/validation_sim/stim_amp1em10_stim_num1_stim_dur1_stim_isi3000/Circ_SP_PVBC_gjs_Remove_ch_none_Det_stoch_True_Dis_holding_False_gjc0p0_Change_mecomb_False_manual_MEComboInfoFile_False_Load_g_pas_False/num_0/v_per_gid.hdf5'  #''/gpfs/bbp.cscs.ch/home/amsalem/Dropbox/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/v_per_gid.hdf5' | -84
+                        
                         simulation_duration = 3000
                         RunMode = 'RunMode WholeCell'
-                        if type(settings['vc_amp'])!=str: v_clamp[settings['vc_amp']] = ['PV_mc2']
-                        if settings['disable_holding'] == False:raise Exception('not a good Idea to run holding and VClamp in the same time') 
+                        if type(settings['vc_amp'])!=str: v_clamp[settings['vc_amp']] = [circuit_to_run[circ]['circuit_target']]
+                        print([' I am runing hoding and VClamp in the same time - you need to think about it!\n']*5) 
                     
         
                 
                 
-                    
-                base_path = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions_v1/hippocampus/circ14_11_2018/'
+                #debug
+                if 'vc_amp' in settings and not os.path.isfile(settings['vc_amp']):raise Exception("file vc_amp does not exist")
+                if settings['load_g_pas'] and not os.path.isfile(settings['load_g_pas']):raise Exception("file load_g_pas does not exist")
+                if 'manual_MEComboInfoFile' in settings and settings['manual_MEComboInfoFile'] and not os.path.isfile(settings['manual_MEComboInfoFile']):raise Exception("file manual_MEComboInfoFile does not exist",settings['manual_MEComboInfoFile'])
+                                
+                
+                base_path = circuit_to_run[circ]['base_path']
+                #base_path = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions_v1/thalamus/circ19_04_2018/'
                 if knl:
                     base_path +='knl'
                 if core_neuron:
@@ -224,7 +315,7 @@ for remove_channels in ['none']:
                 base_path+='/'
                 path_for_simulations = create_directory(base_path, settings)
                 raw_input(path_for_simulations)
-                create_path_and_copy_file(path_for_simulations)
+                create_path_and_copy_file(path_for_simulations, circuit_to_run[circ]['model_folders'])
                 pickle.dump(settings, open(path_for_simulations +'/settings.p','w'))
                 
                 
@@ -236,7 +327,7 @@ for remove_channels in ['none']:
 
 
                 if settings['procedure_type'] == 'validation_sim':
-                    stim_vars, optogenetic_vars, simulation_duration = create_current_injections(path_for_simulations)
+                    stim_vars, optogenetic_vars, simulation_duration = create_current_injections(path_for_simulations, gids_to_test)
 
 
 

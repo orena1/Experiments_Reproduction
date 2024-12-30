@@ -10,8 +10,9 @@ if sys.version_info[0] < 3:
 
 non_sotchastic_mechs = ['NaTs2_t', 'SKv3_1', 'Nap_Et2', 'Ih', 'Im', 'KdShu2007',
                 'K_Pst', 'K_Tst', 'Ca', 'SK_E2', 'Ca_LVAst', 'CaDynamics_E2'
-                ,'NaTa_t', 'CaDynamics_DC0','Ca_HVA2', 'NaTg'] +
-                ['TC_cad', 'TC_ih_Bud97', 'TC_Nap_Et2', 'TC_iA', 'TC_iL', 'SK_E2', 'TC_HH', 'TC_iT_Des98']
+                ,'NaTa_t', 'CaDynamics_DC0','Ca_HVA2', 'NaTg']  \
+                + ['TC_cad', 'TC_ih_Bud97', 'TC_Nap_Et2', 'TC_iA', 'TC_iL', 'TC_HH', 'TC_iT_Des98'] \
+                + ['kdrb', 'na3', 'kap', 'hd', 'can', 'cal', 'cat', 'cagk', 'kca', 'cacum' ,'kdb', 'kmb', 'kad', 'nax', 'cacumb']
 
 sotchastic_mechs = ['StochKv', 'StochKv2', 'StochKv3']
 
@@ -38,6 +39,7 @@ if settings['procedure_type'] == 'rm_correction':
     load_g_pas_correction_file = 1
 elif settings['procedure_type'] in ['validation_sim', 'find_holding_current']:
     gjc = settings['gjc']
+    h.node0.log("set GJc = " + str(gjc))
     h.node0.updateGJcon(gjc)
    
     # remove active channels 
@@ -47,9 +49,11 @@ elif settings['procedure_type'] in ['validation_sim', 'find_holding_current']:
     if remove_channels=='only_stoch':       Mechanisims=sotchastic_mechs
     if remove_channels=='only_non_stoch':   Mechanisims=non_sotchastic_mechs
     h.node0.log("Removing channels type = " + remove_channels)
-    for i in h.allsec():
+    
+
+    for sec in h.allsec():
         for mec in Mechanisims:
-            h('uninsert ' +mec)
+            if mec in dir(sec(.5)): sec.uninsert(mec)
 
 
     if 'special_tag' in settings:
@@ -67,7 +71,7 @@ elif settings['procedure_type'] in ['validation_sim', 'find_holding_current']:
                 cell = h.node0.pnm.pc.gid2cell(h.node0.cellDistributor.getSpGid(gid))
                 for sec in cell.all:
                     for seg in sec:
-                        seg.g_pas = g_pas_file['g_pas/' +str(gjc) + '/' + agid][str(seg)[str(seg).index('.')+1:]][settings['currention_iteration_load']]
+                        seg.g_pas = g_pas_file['g_pas/' +str(gjc) + '/' + agid][str(seg)[str(seg).index('.')+1:]][settings['correction_iteration_load']]
         g_pas_file.close()
         h.node0.log("Changing g_pas to fit " + str(gjc) + " Done")
    
@@ -81,18 +85,27 @@ elif settings['procedure_type'] in ['validation_sim', 'find_holding_current']:
             if h.node0.pnm.gid_exists(int(gid[1:])):
                 holding_ic_per_gid[int(gid[1:])] = h.IClamp(0.5, sec = h.node0.pnm.pc.gid2cell(int(gid[1:])).soma[0])
                 holding_ic_per_gid[int(gid[1:])].dur = 9e9 # this will continue also after the BlueConfig holding stopes
-                if settings['disable_holding'] == True:
-                    holding_ic_per_gid[int(gid[1:])].amp = holding_per_gid['holding_per_gid'][str(gjc)][gid][()]
-                else:
-                    holding_ic_per_gid[int(gid[1:])].amp = holding_per_gid['holding_per_gid'][str(gjc)][gid][()] - h.node0.cellDistributor.getMEType(int(gid[1:])).getHypAmp()
+                
+                
+                holding_ic_per_gid[int(gid[1:])].amp = holding_per_gid['holding_per_gid'][str(gjc)][gid][()]
+        
+        h.node0.log(str(["Need to think better about holding, look at manager_python.py below this comment!"]*5))
+                
+                #if settings['disable_holding'] == True:
+                    #holding_ic_per_gid[int(gid[1:])].amp = holding_per_gid['holding_per_gid'][str(gjc)][gid][()]
+                #else:
+                    #holding_ic_per_gid[int(gid[1:])].amp = holding_per_gid['holding_per_gid'][str(gjc)][gid][()] - h.node0.cellDistributor.getMEType(int(gid[1:])).getHypAmp()
+        h.node0.log("Finish manual_MEComboInfoFile")
         
                 
     
 if settings['procedure_type'] == 'find_holding_current' and type(settings['vc_amp'])==str:
-    if settings['disable_holding'] == False: raise Exception("There is no rational in VClamp with holding!")
+    h.node0.log("Start find_holding_current")
+    h.node0.log("-voltage file - " + settings['vc_amp'])
+    
+    if settings['disable_holding'] == False: h.node0.log(str(["I am doing V_clamp and not disable holding! - it is a bit strange, think about it\n"]*3))
     gjc = settings['gjc']
     save_saclamps_voltages = 1
-    
     circuitTarget = h.node0.targetParser.getTarget( h.node0.configParser.parsedRun.get("CircuitTarget").s ) 
     all_gids = circuitTarget.completegids() # Get all the gids in the network
     all_gids = list(set(all_gids)) #? Maybe I need the set() for multisplit.. probably not 
@@ -103,12 +116,13 @@ if settings['procedure_type'] == 'find_holding_current' and type(settings['vc_am
         if h.node0.pnm.gid_exists(gid):
             SEClmap_per_gid[gid] = h.SEClamp(0.5, sec = h.node0.pnm.pc.gid2cell(gid).soma[0])
             SEClmap_per_gid[gid].dur1 = 9e9
-            SEClmap_per_gid[gid].amp1 = v_per_gid['v_per_gid']['a'+str(int(gid))].value
+            SEClmap_per_gid[gid].amp1 = float(v_per_gid['v_per_gid']['a'+str(int(gid))][()])
             SEClmap_per_gid[gid].rs  = 0.0000001
             SEClamp_current_per_gid[gid] = h.Vector()
             SEClamp_current_per_gid[gid].record(SEClmap_per_gid[gid]._ref_i)
     v_per_gid.close()
-    
+    h.node0.log("Finish find_holding_current")
+
 def save_seclamps():
     if save_saclamps_voltages:
         h.node0.log('Saving Data')

@@ -1,0 +1,54 @@
+This manual will instruct how to correctly add GJs to a circuit.
+
+
+First step is to use dendro-dendritic touch detection in order to create a x.sonata file.
+
+After you create a sonata file, you need to create a template BlueConfig, see BlueConfig_template, modify accordingly to fit your circuit,
+    but make sure to add the gapjunctions projection block accordingly and to keep (Reports) and (OptStim) 
+    Change the user-name and project in launchScript_bg_template.sh, no need to change anything else in launchScript_bg_template.sh
+
+Create a folder with the files BlueConfig_template, launchScript_bg_template.sh and user.target, 
+    the next of the instructions assume those files are in the Circuit_Path
+    
+Open send_sim_to_share.py and add a dict to the values to the circuit_to_run, 
+    I'll explain how with the example:
+   'thalamus_19_11_2019_gjs_19_20_20':{'gids_to_test':[33432,29392, 30161, 32302, 29140],
+                         'base_path':'/gpfs/bbp.cscs.ch/project/proj55/amsalem/gap_junctions/circ19_11_2019_gjs_19_20_20_new_holding/',
+                         'circuit_target':'mc2_Rt',
+                         'model_folders':'../Circuits_data/Thalamus/19_11_2019_gjs_19_20_20/', 
+                         'hoc_lib':'',
+                         'special_path':'special -mpi ',
+                         'bbpviz_txt':'module load archive/2020-02\nmodule load neurodamus-thalamus/0.3\nmodule load py-h5py/2.10.0\n export HOC_LIBRARY_PATH=/gpfs/bbp.cscs.ch/home/amsalem/rsync/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/hoclib_thalamus_0p3/' 
+                     }
+                     
+    'thalamus_19_11_2019_gjs_19_20_20' - This is a identifier of the circuit, you can choose whatever you like
+    'base_path' - the path to run the simulations in, this has to be the same.
+    'gids_to_test' - Sample gids of neurons with GJs that will be used for testing
+    'circuit_target' - the target of only the neurons with GJs (example: in v5 PV_mc2)
+    'full_target' - the target for running a full simulation with GJs  (example: in v5 mc2_Column)
+    'model_folders' - path of the folder you created above (Circuit_Path)
+    'hoc_lib' - ignore
+    'special_path' - leave as is
+    'bbpviz_txt' keeps the modules that need to be loaded, and also change the hoc path, as currently the hocs need to be changed,
+                 once we move to neurodamus-py we could use the defualt hoc.
+                 For now, use this one for thalamus - /gpfs/bbp.cscs.ch/home/amsalem/rsync/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/hoclib_thalamus_0p3/
+                 Or this one for the hippocampus - /gpfs/bbp.cscs.ch/home/amsalem/rsync/Blue_Brain/Experiments_Reproduction/Coupling_Coefficient/hoclib_hippocampus/
+                 
+
+Go to line 66 and change the value of circ parameter to the circuit identifier that you choose (in the example above it is thalamus_19_11_2019_gjs_19_20_20)
+
+You will need to run 5 different procedure simulations. The steps depend on each other, so you need to wait for 
+    a simulation to finish before starting a new one This is decided by the value in exp_name.
+    
+    0_rm_correction - this step load the neurons and add GJs, and check what modification is need for the g_pas to keep the original input resistance
+    1_extract_holding_voltage - this step run the network without GJs and test what is the holding voltage in each neuron.
+    2_find_correct_holding - this step run the simulation with GJs and the compensation current. It then check for is the current is needed 
+                             to get to the holding voltage recorded in step 0
+    3,4,5 - are different validation simulations.
+    6 - run a analysis script for the validation simulation, it will create a image named ????
+    7 - create example simulation and print the folder in which the example simulation was crated 
+    
+See the folder that was printed in 7, go to that folder and read the README file in that folder.
+
+
+                          

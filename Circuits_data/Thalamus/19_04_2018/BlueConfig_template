@@ -16,7 +16,7 @@ Run Default
 
 
       	RunMode LoadBalance
-    CircuitTarget Mosaic
+    CircuitTarget Rt_RC
          Duration 7000
                Dt 0.025
 	 ForwardSkip 5000

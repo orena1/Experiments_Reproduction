@@ -1,0 +1,40 @@
+Run Default
+{
+    CircuitPath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22
+    MorphologyPath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/morphology_release/2021-02-19
+    METypePath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/modelmanagement/2021-02-20/hoc
+    MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/modelmanagement/2021-02-20/mecombo_emodel.tsv
+    CellLibraryFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22/sonata/networks/nodes/All/nodes.h5
+    BioName /gpfs/bbp.cscs.ch/project/proj55/entities/bionames/O1v3_2020-02-22
+    Atlas /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/atlases/O1-323/
+
+    CurrentDir /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22/test-simulations/base-circuit/
+    OutputRoot /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22/test-simulations/base-circuit/
+
+    RunMode LoadBalance
+    CircuitTarget Rt_RC
+    Duration 3000
+    Dt 0.025
+    ForwardSkip 5000
+
+}
+
+Projection gapjunction
+{
+    Path  /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2021-21-22/proj_gap-junctions
+    Type GapJunction
+}
+
+Reports
+
+
+# Deleuze and Huguenard, 2016
+Connection TC_Rt_NMDA
+{       
+              Source VPL_TC
+         Destination Rt_RC
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.57
+}
+
+OptStim

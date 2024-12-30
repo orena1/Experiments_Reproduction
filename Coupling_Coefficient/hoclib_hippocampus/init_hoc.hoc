@@ -1,0 +1,300 @@
+/**
+ * @file init.hoc
+ * @author Leite
+ * @date 2018-Oct
+ * @remark Copyright © BBP/EPFL 2005-2011; All rights reserved. Do not distribute without further notice.
+ */
+{load_file( "perfUtils.hoc" )}
+{load_file( "nrngui.hoc" )}
+{load_file( "netparmpi.hoc" )}
+{load_file( "SimSettings.hoc" )}
+{load_file( "Node.hoc" )}
+{load_file( "ShowProgress.hoc" )}
+{load_file( "timeit.hoc" )}
+{load_file( "fileUtils.hoc" )}
+
+default_var("configFile", "BlueConfig")
+
+
+/**
+ * @param $o1 the node object to run the cycle with. Targets must alredy be loaded
+ */
+proc build_model() {  localobj node, PO, imp
+    node = $o1
+    timeit() //(re)init timer
+
+    runtime_stats("Computing LB")
+    node.computeLB()
+    runtime_stats("Compute LB")
+
+    node.log( "Building model for simulation" )
+    node.createCells()
+    node.executeNeuronConfigures()  // Apply any cell overrides from BlueConfig
+    runtime_stats( "Cell creation" )
+
+    node.log( "Creating Synapses" )
+    //node.createSynapses()
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    node.log( "Not creating Synapses, workaround!!!!" )
+    runtime_stats("Synapse creation")
+
+    node.log( "Creating Gap Junctions" )
+    node.createGapJunctions()
+    runtime_stats("Gap Junction creation")
+
+    // Do we need to restore network state?  Preliminary load
+    node.checkResume()
+
+    //create stims
+    node.log( "Enable Stimulus" )
+    node.enableStimulus()
+    runtime_stats("Enable Stimulus")
+    
+    nrnpython("Mechanisims = ['kdrb', 'na3', 'kap', 'hd', 'can', 'cal', 'cat', 'cagk', 'kca', 'cacum' ,'kdb', 'kmb', 'kad', 'nax', 'cacumb']")
+    nrnpython("from neuron import h")
+    nrnpython("for sec in list(h.allsec()):\n    for mec in Mechanisims:\n        if mec in dir(sec(.5)):\n            sec.uninsert(mec)")
+    
+    
+    imp = new Impedance()
+    finitialize(v_init)
+    node.pnm.pc.setup_transfer()
+    
+    
+    
+    node.updateGJcon(0.1)
+    for ii=0, 2 {
+        if( node.pnm.myid == ii ) {
+            node.pnm.pc.gid2cell(node.cellDistributor.getGidListForProcessor().x[0]).soma[0]{
+                imp.loc(.5) 
+            }
+        }
+        steps = imp.compute(0, 1)//#, 15000)
+        imp.loc(-1)
+        
+        if( node.pnm.myid == ii ) {
+            node.pnm.pc.gid2cell(node.cellDistributor.getGidListForProcessor().x[0]).soma[0]{
+                print "import transfer below"
+                print imp.transfer(.5)
+                print "\n\n\n\n\n\n"
+            }
+        }
+    }
+    
+    runtime_stats("Loading manager_python")
+    node.pnm.pc.barrier()
+
+    //apply any modifications
+    node.log( "Enable Modifications" )
+    node.enableModifications()
+    runtime_stats("Enable Modifications")
+
+    //create reports
+    node.log( "Enable Reports" )
+    node.enableReports()
+    runtime_stats("Enable Reports")
+
+    //finish setup
+    node.finalizeModel()
+    runtime_stats("Model Finalized")
+    
+    
+        
+
+    
+}
+
+
+proc restore() { localobj node
+    node = $o1
+    node.log("Loading targets...")
+    node.loadTargets()
+    node.log("Enable Replay")
+    node.enableReplay()
+    node.log( "Enable Reports" )
+    node.enableReports()
+    node.postRestoreConfig()
+}
+
+
+proc run_end()  { localobj node, PO
+    node = $o1
+    node.log( "Starting simulation..." )
+    node.prun()
+    runtime_stats("finished Run")
+
+    //PO = new PythonObject()
+    //PO.save_seclamps()
+    
+    
+    //clean up and exit
+    node.cleanup()
+    quit()
+}
+
+
+// Several things are only avail after Node.init()
+// including populated simConfig
+objref node0
+runtime_stats()  // Reference mem and time
+node0 = new Node(configFile)  // Global init
+
+// If Restore do it immediately
+if( simConfig.coreNeuronUsed() && node0.configParser.parsedRun.exists( "Restore" ) ) {
+    node0.log("RESTORING with CoreNEURON")
+    node0.log("=========================")
+    restore(node0)
+    run_end(node0)
+}
+
+
+// ==============================================================================================
+// Stardard neurodamus run (not restore)
+// ==============================================================================================
+
+objref pc
+pc = new ParallelContext()
+
+
+func getStartCycle() { local startCycle, nCycles  localobj cndatafile, commvec
+    strdef cnfilename, outputRoot
+    nCycles = $1
+    outputRoot = $s2
+    commvec = new Vector(1)
+    startCycle = 0
+
+    // resume? check for existing files_x.dat
+    if( pc.id() == 0 ) {
+        for cycleIndex=0, nCycles-1 {
+            sprint( cnfilename, "%s/coreneuron_input/files_%d.dat", node0.configParser.parsedRun.get( "OutputRoot" ).s, cycleIndex )
+            if( fileExists(cnfilename) ) {
+                startCycle = cycleIndex + 1
+            } else {
+                break
+            }
+        }
+        commvec.x[0] = startCycle
+    }
+    pc.broadcast( commvec, 0 )
+    startCycle = commvec.x[0]
+    return startCycle
+}
+
+
+proc mergeFilesdat()  { local ncycles, cycleIndex, nlines  localobj cnEntries, cnFile
+    strdef cnfilename, cndataline, outputRoot
+    strdef line0
+    ncycles = $1
+    outputRoot = $s2
+    cnFile = new File()
+    cnEntries = new List()
+
+    print "Generating merged files.dat"
+
+    for cycleIndex=0,ncycles-1 {
+        print " -> files_", cycleIndex, ".dat"
+        sprint( cnfilename, "%s/coreneuron_input/files_%d.dat", outputRoot, cycleIndex )
+        cnFile.ropen( cnfilename )
+        {cnFile.gets( cndataline )}
+        line0 = cndataline
+        nlines = cnFile.scanvar()  // should be nranks
+        for lineIndex=0, nlines-1 {
+            cnEntries.append( new String() )
+            {cnFile.gets( cnEntries.o(cnEntries.count()-1).s )}
+        }
+        cnFile.close()
+    }
+
+    sprint( cnfilename, "%s/coreneuron_input/files.dat", outputRoot ) //node.configParser.parsedRun.get( "OutputRoot" ).s )
+    print "write ", cnfilename
+    cnFile.wopen( cnfilename )
+    cnFile.printf( line0 )
+    cnFile.printf( "%d\n", cnEntries.count() )
+    for lineIndex=0, cnEntries.count()-1 {
+        cnFile.printf( cnEntries.o(lineIndex).s )
+    }
+    cnFile.close()
+    print "done merging files.dat"
+}
+
+
+// Main processing
+// ===============
+proc main() {local nCycles, startCycle, cycleIndex, i  localobj subTargets, configParser, targetParser, curTarget
+    strdef tmpstr, outputRoot
+    outputRoot = node0.configParser.parsedRun.get( "OutputRoot" ).s
+
+    node0.log("Loading targets")
+    node0.loadTargets()
+    runtime_stats("Target Load")
+    subTargets = node0.splitDataGeneration()
+    nCycles = subTargets.count()
+    node0.log("")
+
+    if( nCycles <= 1 ) {  // Trivial run
+        build_model(node0)
+        run_end(node0)
+    }
+
+    node0.log("NEURODAMUS MULTI-CYCLE RUN: ", nCycles, "iterations")
+    node0.log("==========================")
+    startCycle = getStartCycle(nCycles, outputRoot)
+
+    if( startCycle > 0 ) {
+        if( pc.id() == 0 ) print ">> RESUMING from iteration ", startCycle
+    }
+
+    // Reuse config and target parsers which have been modified
+    configParser = node0.configParser
+    targetParser = node0.targetParser
+
+    for cycleIndex=startCycle, nCycles-1 {
+        curTarget = subTargets.o(cycleIndex)
+        if( pc.id() == 0 ) print "LOOP ", cycleIndex, "Buildind model for target ", curTarget.name
+        sprint( configParser.parsedRun.get( "CircuitTarget" ).s, curTarget.name )
+
+        // destroy and build a new node, reuse configParser and targetParser
+        // node0 var is reused on purpose to ensure all references are gone
+        node0.log("MEMORY Before - After cleaning")
+        memUsage.print_mem_usage()
+        node0.clearModel()
+        node0 = nil
+        memUsage.print_mem_usage()
+
+        node0 = new Node(configParser)
+        node0.targetParser = targetParser   // assign, dont load
+
+        // Run for the cycle
+        build_model(node0)
+
+        if( pc.id() == 0 ) {
+            sprint( tmpstr, "coreneuron_input/files_%d.dat", cycleIndex )
+            shutil( "move", "coreneuron_input/files.dat", tmpstr, outputRoot )
+        }
+    }
+
+    if( pc.id() == 0 ) {
+        mergeFilesdat(nCycles, outputRoot)
+    }
+
+    run_end(node0)
+}
+
+// Ignition!
+main()

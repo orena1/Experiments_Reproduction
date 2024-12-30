@@ -1,0 +1,9 @@
+> git push origin master:master
+remote: warning: File Coupling_Coefficient/.ipynb_checkpoints/modify_send_sim_To_include_WF_cutting-checkpoint.ipynb is 74.16 MB; this is larger than GitHub's recommended maximum file size of 50.00 MB        
+remote: error: Trace: f3fe3cdd553d24b705893bdd4e8bbb183f8ac1d4f156349bc8f39b59dbe61e47        
+remote: error: See https://gh.io/lfs for more information.        
+remote: error: File Coupling_Coefficient/modify_send_sim_To_include_WF_cutting.ipynb is 100.95 MB; this exceeds GitHub's file size limit of 100.00 MB        
+remote: error: GH001: Large files detected. You may want to try Git Large File Storage - https://git-lfs.github.com.        
+To https://github.com/orena1/Experiments_Reproduction.git
+ ! [remote rejected] master -> master (pre-receive hook declined)
+error: failed to push some refs to 'https://github.com/orena1/Experiments_Reproduction.git'

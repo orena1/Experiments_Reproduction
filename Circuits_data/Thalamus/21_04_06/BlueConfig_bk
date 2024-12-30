@@ -1,0 +1,33 @@
+Run Default
+{
+
+   MorphologyPath /gpfs/bbp.cscs.ch/project/proj82/entities/morph-release-thal_2021-03-10/release
+   METypePath   /gpfs/bbp.cscs.ch/project/proj82/entities/memodels-thal_2021-03-27/hoc
+   MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj82/entities/memodels-thal_2021-03-27/mecombo_emodel.tsv
+
+   CircuitPath /gpfs/bbp.cscs.ch/project/proj82/circuits/Thalamus/20210406
+   nrnPath /gpfs/bbp.cscs.ch/project/proj82/circuits/Thalamus/20210406/connectome/functional/edges.h5
+   CellLibraryFile circuit.mvd3
+
+   BaseSeed 333024
+
+   Simulator CORENEURON
+   RNGMode Random123
+      
+
+   CurrentDir /gpfs/bbp.cscs.ch/project/proj55/amsalem/20210406/circuit_with_onlyGJs
+   OutputRoot /gpfs/bbp.cscs.ch/project/proj55/amsalem/20210406/circuit_with_onlyGJs
+ 
+
+      	RunMode LoadBalance
+    CircuitTarget Rt_RC 
+         Duration 100
+               Dt 0.025
+	 ForwardSkip 5000
+}
+
+Projection gapjunction
+{
+    Path /gpfs/bbp.cscs.ch/project/proj82/circuits/Thalamus/20210406/sonata/networks/edges/gap-junctions/All/edges.h5
+    Type GapJunction
+}

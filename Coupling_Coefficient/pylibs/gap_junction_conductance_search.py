@@ -9,10 +9,23 @@ import os
 
 import sys
 from numbers import Number
-from collections import Set, Mapping, deque
+from collections.abc import Set, Mapping, deque
 
 from tqdm import tqdm
 
+
+if h.node0.pnm.myid==0:
+    ll = list(h.Gap)
+    print('Number of GJs in node 0 = ' + str(ll))
+    print(ll[0].get_segment())
+if h.node0.pnm.myid==1:
+    ll = list(h.Gap)
+    print('Number of GJs in node 1 = ' +str(ll))
+    print(ll[0].get_segment())
+sys.stdout.flush()
+h.node0.pnm.pc.barrier()
+
+#sdfsdf
 
 try: # Python 2
     zero_depth_bases = (basestring, Number, xrange, bytearray)
@@ -46,23 +59,92 @@ def getsize(obj_0):
 
 
 
+def save_data(gjc):
+    # gjc set the conductance for which to save data for.
+    
+    h.node0.log('Saving Data')
+    data_to_save = {}
+    data_to_save['Rins'] = Rins[gjc]
+    data_to_save['CCs'] = CCs[gjc]
+    data_to_save['g_pas_per_gjc_per_gid_per_seg'] = g_pas_per_gjc_per_gid_per_seg[gjc]
 
+    save_path = f'{h.node0.configParser.parsedRun.get("OutputRoot").s}/{gjc}'
+    if h.node0.pnm.myid==0:
+        os.makedirs(save_path,exist_ok=True)
+    h.node0.pnm.pc.barrier() 
+    pickle.dump(data_to_save, open(f'{save_path}/data_for_host_{int(h.node0.pnm.myid)}.p','wb'))
+    
+    # h.node0.pnm.pc.barrier() 
+    # h.node0.log('merging pickles')
+    # if h.node0.pnm.myid==0:
+    #     data_for_host = {}
+    #     nhost = h.node0.pnm.pc.nhost()
+    #     for hn in range(nhost):
+    #         data_for_host[hn] = pickle.load(open(f'{save_path}/data_for_host_' + str(hn) + '.p','rb'))
+        
+        
+    #     all_values = data_for_host.values()
+        
+    #     # merge CCs
+    #     for i in all_values:
+    #         for gc in i['CCs']:
+    #             for pre_gid in i['CCs'][gc]:
+                    
+    #                 if pre_gid not in CCs[gc]: CCs[gc][pre_gid] = {}
+                    
+    #                 for post_gid in i['CCs'][gc][pre_gid]:
+    #                     CCs[gc][pre_gid][post_gid] = np.array(i['CCs'][gc][pre_gid][post_gid])
+
+    #     # merge Rins
+    #     for i in all_values:
+    #         for gc in i['Rins']:
+    #             for gid in Rins[gc]:
+    #                 if i['Rins'][gc][gid]:
+    #                     Rins[gc][gid] = np.array(i['Rins'][gc][gid])
+                        
+                        
+    #     # merge g_pas_per_gjc_per_gid_per_seg
+    #     for i in all_values:
+    #         for gc in i['g_pas_per_gjc_per_gid_per_seg']:
+    #             for gid in i['g_pas_per_gjc_per_gid_per_seg'][gc]:
+    #                 for segname in i['g_pas_per_gjc_per_gid_per_seg'][gc][gid]:
+    #                     i['g_pas_per_gjc_per_gid_per_seg'][gc][gid][segname] = np.array(i['g_pas_per_gjc_per_gid_per_seg'][gc][gid][segname])
+    #                 g_pas_per_gjc_per_gid_per_seg[gc][gid] = i['g_pas_per_gjc_per_gid_per_seg'][gc][gid]
+        
+    #     # save merged data
+    #     data_to_save = {}
+    #     data_to_save['Rins'] = Rins
+    #     data_to_save['CCs'] = CCs
+    #     data_to_save['g_pas_per_gjc_per_gid_per_seg'] = g_pas_per_gjc_per_gid_per_seg
+    #     pickle.dump(data_to_save, open(f'{save_path}/merged_data.p','wb'),2)
+        
+    #     pickle.dump(data_for_host, open(f'{save_path}/data_for_host_merged.p','wb'),2)
+    h.node0.pnm.pc.barrier() 
+    if h.node0.pnm.myid==0:
+        with open(f'{save_path}/completed.txt','w') as f:
+            f.write('Done - ') #add datetime
+            
+    h.node0.log('*END* Saving Data')
+    
 #Broadcast input resistance 
 # so that each node will know what is the input resistance in split cell that it have
+
+#Rins = dict((gc,{gid:[] for gid in all_gids}) for gc in [0] + GJcs)
+
 
 def broadcast_Rins(gc, Rins):
     h.node0.log('\nbroadcast Rins start , gc=' + str(gc)); st = time.time()
     #data = [Rins for i in range(int(h.node0.pnm.pc.nhost()))]
-    data = h.node0.pnm.pc.py_allgather(Rins)
+    data = h.node0.pnm.pc.py_allgather(Rins[gc])
     
     #data = h.node0.pnm.pc.py_alltoall(data)
     for i in data:
-        for gid in i[gc]:
-            if len(i[gc][gid]) > len(Rins[gc][gid]):
-                Rins[gc][gid] = i[gc][gid]
+        for gid in i:
+            if len(i[gid]) > len(Rins[gc][gid]):
+                Rins[gc][gid] = i[gid]
 
     h.node0.log('broadcast Rins finish , gc=' + str(gc) +'  took ' + str(time.time()-st) + '\n')
-    
+    h.node0.pnm.pc.barrier()
     return(Rins)
     
 pbar = 0 
@@ -87,15 +169,16 @@ def measure_Rin_impedance(all_gids, CCs, Rins, gc = None):
     #globals - imp, h, 
     if gc is not None:
         h.node0.updateGJcon(gc)
+    h.node0.pnm.pc.barrier() 
     h.node0.pnm.pc.setup_transfer()
       
     #h.dt = 5000
     #for i in range(5):
         #h.node0.log( str(i))
         #h.fadvance()
-    
-    #h.dt = 5000
-    #[h.fadvance() for i in range(50)]
+    h.node0.finalizeModel()
+    h.dt = 5000
+    [h.fadvance() for i in range(5)]
     h.dt = 0.025
     [h.fadvance() for i in range(50)]
     
@@ -103,19 +186,67 @@ def measure_Rin_impedance(all_gids, CCs, Rins, gc = None):
     for pre_gid in all_gids:
         if h.node0.pnm.gid_exists(pre_gid):
             imp.loc(.5, sec = h.node0.pnm.pc.gid2cell(pre_gid).soma[0])
+
         steps = imp.compute(0, 1, 15000)
-        
         if h.node0.pnm.gid_exists(pre_gid):
             Rins[gc][pre_gid].append(imp.transfer(.5, sec = h.node0.pnm.pc.gid2cell(pre_gid).soma[0]))
-            
-        for post_gid in all_gids:
-            if h.node0.pnm.gid_exists(post_gid):
-                CCs[gc][pre_gid][post_gid].append(imp.transfer(.5, sec = h.node0.pnm.pc.gid2cell(post_gid).soma[0]))
-        h.node0.pnm.pc.barrier()
+        
+        if pre_gid in CCs[gc]:#for CC subsampeling
+            for post_gid in all_gids:
+                if post_gid in CCs[gc][pre_gid]:#for CC subsampeling
+                    if h.node0.pnm.gid_exists(post_gid):
+                        CCs[gc][pre_gid][post_gid].append(imp.transfer(.5, sec = h.node0.pnm.pc.gid2cell(post_gid).soma[0]))
         imp.loc(-1)
         node0_tqdm()
     node0_tqdm(close=1)
     return(CCs, Rins) # no need to return them.. but still.
+
+
+# Need more work!
+#def measure_Rin_current_injection(all_gids, CCs, Rins, gc = None):
+    ##globals - imp, h, 
+    #if gc is not None:
+        #h.node0.updateGJcon(gc)
+    #h.node0.pnm.pc.barrier() 
+    #h.node0.pnm.pc.setup_transfer()
+      
+    ##h.dt = 5000
+    ##for i in range(5):
+        ##h.node0.log( str(i))
+        ##h.fadvance()
+    #h.node0.finalizeModel()
+    #h.dt = 5000
+    #[h.fadvance() for i in range(5)]
+    #h.dt = 0.025
+    #[h.fadvance() for i in range(50)]
+    
+    ## With impedance tool
+    #for pre_gid in all_gids:
+        #h.finitialize(h.v_init)
+        #if h.node0.pnm.gid_exists(pre_gid):
+            #current_clamp[pre_gid].amp   = 
+            #current_clamp[pre_gid].dur   =
+            #current_clamp[pre_gid].delay =
+        
+        #value = -1
+        #if h.node0.pnm.gid_exists(pre_gid):
+            #Rins[gc][pre_gid].append( (v_per_gid[pre_gid][-1] - v_per_gid[pre_gid][x] ) / c_amp)
+            #dV = (v_per_gid[pre_gid][-1] - v_per_gid[pre_gid][x] )
+        #h.node0.pnm.pc.allgather(dV, result_vector)
+        #dV = max(result_vector)
+        #for post_gid in all_gids:
+            #if h.node0.pnm.gid_exists(post_gid):
+                #CCs[gc][pre_gid][post_gid].append( (v_per_gid[pre_gid][-1] - v_per_gid[pre_gid][x] ) / dV)
+
+        #node0_tqdm()
+    #node0_tqdm(close=1)
+    #return(CCs, Rins) # no need to return them.. but still.
+
+
+
+
+
+
 
 if settings['rm_correction_type']=='impedance_tool':
     measure_Rin = measure_Rin_impedance
@@ -125,6 +256,7 @@ elif settings['rm_correction_type']=='current_injection':
 
 # set variables
 GJcs = settings['rm_correction_gjcs'] # a list of Gap Junction conductances, for each value in the list a g_pas value that results in the original input resistance will be searched
+GJcs = [gjc for gjc in GJcs if not os.path.exists(f'{h.node0.configParser.parsedRun.get("OutputRoot").s}/{gjc}/completed.txt')]
 number_of_iterations = settings['rm_correction_number_of_iterations'] # Number of iteration for g_pas search
 cm = settings['rm_correction_cm']
 
@@ -133,11 +265,6 @@ cm = settings['rm_correction_cm']
 
 h.node0.log( "--------------------------- starting python script  ---------------------------" )
 h.node0.finalizeModel()
-h.node0.log( "SET cvode to 0" )
-cvode=h.CVode()
-h.node0.log( str(cvode.active()))
-x = cvode.active(False)
-h.node0.log(str(x))
 h.node0.log( "----")
 #asdas
 circuitTarget = h.node0.targetParser.getTarget( h.node0.configParser.parsedRun.get("CircuitTarget").s ) 
@@ -150,7 +277,8 @@ h.node0.log('len all_gids = ' + str(len(all_gids)) + ' len gid_in_node ' + str(l
 
 v_per_cell = {} # dictionary to record the voltage of the cell
 IClamps = {}  # dictionary to keep track for the IClamps
-CCs = dict((gc,{pre_gid:{post_gid:[] for post_gid in gid_in_node} for pre_gid in all_gids}) for gc in [0] + GJcs)
+h.node0.log('I measure CC only in a few neurons!!')
+CCs = dict((gc,{pre_gid:{post_gid:[] for post_gid in gid_in_node[:2]} for pre_gid in all_gids[:60]}) for gc in [0] + GJcs)
 Rins = dict((gc,{gid:[] for gid in all_gids}) for gc in [0] + GJcs)
 h.node0.log('CCs size = ' + str(getsize(CCs)/1000.0/1000) + ' Rins size = ' + str(getsize(Rins)/1000.0/1000))
 
@@ -173,28 +301,39 @@ g_pas_per_gjc_per_gid_per_seg = {gc:{gid:{seg:[g_pas_per_seg_per_gid[gid][seg]] 
 # remove active channels 
 non_sotchastic_mechs = ['NaTs2_t', 'SKv3_1', 'Nap_Et2', 'Ih', 'Im', 'KdShu2007',
                  'K_Pst', 'K_Tst', 'Ca', 'SK_E2', 'Ca_LVAst', 'CaDynamics_E2'
-                 ,'NaTa_t', 'CaDynamics_DC0','Ca_HVA2', 'NaTg'] +
-                ['TC_cad', 'TC_ih_Bud97', 'TC_Nap_Et2', 'TC_iA', 'TC_iL', 'SK_E2', 'TC_HH', 'TC_iT_Des98']
+                 ,'NaTa_t', 'CaDynamics_DC0','Ca_HVA2', 'NaTg']  \
+                + ['TC_cad', 'TC_ih_Bud97', 'TC_Nap_Et2', 'TC_iA', 'TC_iL', 'TC_HH', 'TC_iT_Des98'] \
+                + ['kdrb', 'na3', 'kap', 'hd', 'can', 'cal', 'cat', 'cagk', 'kca', 'cacum' ,'kdb', 'kmb', 'kad', 'nax', 'cacumb']
+
+
+
 
 sotchastic_mechs = ['StochKv', 'StochKv2', 'StochKv3']
 
 
 remove_channels = settings['remove_channels']
-Mechanisims =[]
+Mechanisims =[] 
 if remove_channels=='all':              Mechanisims=non_sotchastic_mechs + sotchastic_mechs
 if remove_channels=='only_stoch':       Mechanisims=sotchastic_mechs
 if remove_channels=='only_non_stoch':   Mechanisims=non_sotchastic_mechs 
 
+
 h.node0.log('Remove channels opt = ' + remove_channels)
 
 
-for i in h.allsec():
+h.node0.pnm.pc.barrier()
+for sec in h.allsec():
     for mec in Mechanisims:
-        h('uninsert ' +mec)
-        
+        if mec in dir(sec(.5)): 
+            sec.uninsert(mec)
+            #h("uninsert " + mec)#
+    
+if h.node0.pnm.myid==0:
+    h.node0.log(str(sec.psection()))
+
 #setup 
 imp = h.Impedance()
-#h("forall {cm=0.0001}")
+h("forall {cm=0.0001}")
 
 h.finitialize(h.v_init)
 h.node0.pnm.pc.setup_transfer()
@@ -209,6 +348,9 @@ for gc in GJcs:
     h.node0.log( "\n gjc = " + str(gc) + ' ' + str(GJcs.index(gc)) + '/' + str(len(GJcs)))
     measure_Rin(all_gids, CCs, Rins, gc = gc);
     broadcast_Rins(gc, Rins)
+
+# save data for gjc=0
+save_data(gjc=0)
 
 h.node0.log( "\n--------------------------- Attempt to fix Rin by Changing g_pas " + str(number_of_iterations)  + " Iterations--------------------------- " )
 num_cells_skiped = 0
@@ -269,72 +411,25 @@ for gc in GJcs:
             h.node0.log( "\n Skipped all cells ")
             break
         
-    h.node0.log( "\n GJc " + str(gc) + " ** Done ** ")
-            
+    h.node0.log( "\n GJc " + str(gc) + " ** Done **  - save data")
+    save_data(gjc=gc)
 
+#if h.node0.pnm.myid==0:
+    #print(CCs[0.25])
+
+#if h.node0.pnm.myid==1:
+    #print(CCs[0.25])
+sys.stdout.flush()
+h.node0.pnm.pc.barrier()
 
 
 
 
 #s
 
-def save_data():
-    h.node0.log('Saving Data')
-    data_to_save = {}
-    data_to_save['Rins'] = Rins
-    data_to_save['CCs'] = CCs
-    data_to_save['g_pas_per_gjc_per_gid_per_seg'] = g_pas_per_gjc_per_gid_per_seg
 
 
-    pickle.dump(data_to_save, open(h.node0.configParser.parsedRun.get("OutputRoot").s  +'/data_for_host_' + str(int(h.node0.pnm.myid)) + '.p','wb'),2)
-    
-    h.node0.pnm.pc.barrier() 
-    h.node0.log('merging pickles')
-    if h.node0.pnm.myid==0:
-        data_for_host = {}
-        nhost = h.node0.pnm.pc.nhost()
-        for hn in range(nhost):
-            data_for_host[hn] = pickle.load(open(h.node0.configParser.parsedRun.get("OutputRoot").s  +'/data_for_host_' + str(hn) + '.p','rb'))
-        
-        
-        all_values = data_for_host.values()
-        
-        # merge CCs
-        for i in all_values:
-            for gc in i['CCs']:
-                for pre_gid in CCs[gc]:
-                    for post_gid in i['CCs'][gc][pre_gid]:
-                        CCs[gc][pre_gid][post_gid] = np.array(i['CCs'][gc][pre_gid][post_gid])
-
-        # merge Rins
-        for i in all_values:
-            for gc in i['Rins']:
-                for gid in Rins[gc]:
-                    if i['Rins'][gc][gid]:
-                        Rins[gc][gid] = np.array(i['Rins'][gc][gid])
-                        
-                        
-        # merge g_pas_per_gjc_per_gid_per_seg
-        for i in all_values:
-            for gc in i['g_pas_per_gjc_per_gid_per_seg']:
-                for gid in i['g_pas_per_gjc_per_gid_per_seg'][gc]:
-                    for segname in i['g_pas_per_gjc_per_gid_per_seg'][gc][gid]:
-                        i['g_pas_per_gjc_per_gid_per_seg'][gc][gid][segname] = np.array(i['g_pas_per_gjc_per_gid_per_seg'][gc][gid][segname])
-                    g_pas_per_gjc_per_gid_per_seg[gc][gid] = i['g_pas_per_gjc_per_gid_per_seg'][gc][gid]
-        
-        # save merged data
-        data_to_save = {}
-        data_to_save['Rins'] = Rins
-        data_to_save['CCs'] = CCs
-        data_to_save['g_pas_per_gjc_per_gid_per_seg'] = g_pas_per_gjc_per_gid_per_seg
-        pickle.dump(data_to_save, open(h.node0.configParser.parsedRun.get("OutputRoot").s  +'/merged_data.p','wb'),2)
-        
-        pickle.dump(data_for_host, open(h.node0.configParser.parsedRun.get("OutputRoot").s  +'/data_for_host_merged.p','wb'),2)
-            
-    h.node0.log('*END* Saving Data')
-
-
-save_data()
+#save_data()
 
 
 
@@ -364,5 +459,59 @@ save_data()
             #if i['Rins'][gc][gid]:
                 #Rins[gc][gid] = i['Rins'][gc][gid]
 
+### merge files manually
+#'''
+
+# import os
+# from tqdm import tqdm
+# import pickle
+# import numpy as np
+# files = [f for f in  os.listdir('.') if 'host_' in f and 'merged' not in f]
+# data_for_host = {}
+# for f in tqdm(files):
+#     nm = int(f.split('_')[-1].split('.')[0])
+#     data_for_host[nm] = pickle.load(open('data_for_host_' + str(nm) + '.p','rb'))
+    
+# all_values = data_for_host.values()
+
+# all_values = [data_for_host[i] for i in data_for_host if i!=0]
+
+# CCs = data_for_host[0]['CCs']
+# # merge CCs
+# for i in tqdm(all_values):
+#     for gc in i['CCs']:
+#         for pre_gid in CCs[gc]:
+#             for post_gid in i['CCs'][gc][pre_gid]:
+#                 CCs[gc][pre_gid][post_gid] = np.array(i['CCs'][gc][pre_gid][post_gid])
+
+
+# Rins = data_for_host[0]['Rins']
+# # merge Rins
+# for i in tqdm(all_values):
+#     for gc in i['Rins']:
+#         for gid in Rins[gc]:
+#             if i['Rins'][gc][gid]:
+#                 Rins[gc][gid] = np.array(i['Rins'][gc][gid])
+
+
+# g_pas_per_gjc_per_gid_per_seg = data_for_host[0]['g_pas_per_gjc_per_gid_per_seg']
+# # merge g_pas_per_gjc_per_gid_per_seg
+# for i in tqdm(all_values):
+#     for gc in i['g_pas_per_gjc_per_gid_per_seg']:
+#         for gid in i['g_pas_per_gjc_per_gid_per_seg'][gc]:
+#             for segname in i['g_pas_per_gjc_per_gid_per_seg'][gc][gid]:
+#                 i['g_pas_per_gjc_per_gid_per_seg'][gc][gid][segname] = np.array(i['g_pas_per_gjc_per_gid_per_seg'][gc][gid][segname])
+#             g_pas_per_gjc_per_gid_per_seg[gc][gid] = i['g_pas_per_gjc_per_gid_per_seg'][gc][gid]
+
+# # save merged data
+# data_to_save = {}
+# data_to_save['Rins'] = Rins
+# data_to_save['CCs'] = CCs
+# data_to_save['g_pas_per_gjc_per_gid_per_seg'] = g_pas_per_gjc_per_gid_per_seg
+# pickle.dump(data_to_save, open('merged_data.p','wb'),2)
+# print("Finish saving 1")
+
+# pickle.dump(data_for_host, open('data_for_host_merged.p','wb'),2)
+# print("Finish saving 2")
 
 

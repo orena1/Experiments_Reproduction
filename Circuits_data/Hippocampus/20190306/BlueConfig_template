@@ -1,0 +1,45 @@
+Run Default
+{
+	Date    14:2:13
+	Time    11:32:35
+    svnPath https://bbpteam.epfl.ch/svn/bluebrain
+	Version    1094 
+
+    CircuitPath /gpfs/bbp.cscs.ch/project/proj42/circuits/CA1.O1/20190306
+    nrnPath /gpfs/bbp.cscs.ch/project/proj42/circuits/CA1.O1/20190306/connectome/functional
+    MorphologyPath /gpfs/bbp.cscs.ch/project/proj42/entities/morphologies/20180417/
+    METypePath /gpfs/bbp.cscs.ch/project/proj42/entities/emodels/20190402/hoc
+    MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj42/entities/emodels/20190402/mecombo_emodel.tsv
+    CellLibraryFile circuit.mvd3
+    BioName /gpfs/bbp.cscs.ch/project/proj42/circuits/CA1.O1/20190306/bioname
+    Atlas /gpfs/bbp.cscs.ch/project/proj42/entities/dev/atlas/O1-243
+    TargetFile /gpfs/bbp.cscs.ch/project/proj42/circuits/CA1.O1/20190306/user.target
+    
+    
+      CurrentDir   /gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/VInput_All
+      OutputRoot /gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/VInput_All/100
+    
+    NumSynapseFiles 2048
+    BaseSeed 10
+    #RunMode LoadBalance
+    CircuitTarget SP_PVBC_gjs
+    Duration 5000
+    Dt 0.025
+    ForwardSkip 5000
+}
+
+
+Reports
+
+Projection gapjunction
+{
+    # can use absolute path
+    # Path gap_junctions
+    Path /gpfs/bbp.cscs.ch/project/proj2/circuits/create_GJs_cons/hippocampus/20190306/gap-junctions_0um/
+
+    Type GapJunction
+    Source Non
+}
+
+
+OptStim

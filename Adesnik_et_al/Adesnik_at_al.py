@@ -167,7 +167,7 @@ if high_gamma==True:
 
 
 # Set Gap Junctions
-gap_junction_conductance = 0# 0 | 0.2 |0.5
+gap_junction_conductance = 0.2# 0 | 0.2 |0.5
 gj_paths = {0.2:'/gpfs/bbp.cscs.ch/project/proj2/circuits/SomatosensoryCxS1-v5.r0/O1/0p0um/ncsStructural_gjdevel_withsoma2/pathways/Cond0_2/AlltoAll' ,
             0.5: '/gpfs/bbp.cscs.ch/project/proj2/circuits/SomatosensoryCxS1-v5.r0/O1/0p0um/ncsStructural_gjdevel_withsoma2/pathways/Cond0_5/AlltoAll'}
 gap_junction_path = None

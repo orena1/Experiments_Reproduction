@@ -1,0 +1,75 @@
+Run Default
+{
+	CircuitPath /gpfs/bbp.cscs.ch/project/proj64/circuits/O1.v6a/20171212/
+	nrnPath /gpfs/bbp.cscs.ch/project/proj64/circuits/O1.v6a/20171212/ncsFunctionalAllRecipePathways
+	MorphologyPath /gpfs/bbp.cscs.ch/project/proj59/entities/morphologies/2017.10.31
+	METypePath /gpfs/bbp.cscs.ch/project/proj64/home/vangeit/modelmanagement/prod.20171103/mm_runs/run/1810912/output/emodels_hoc/
+	MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj64/home/vangeit/modelmanagement/prod.20171103/megate_runs/run/6c6d611/output_select/mecombo_emodel.tsv
+	CellLibraryFile circuit.mvd3
+	#Tar_getF_ile /gpfs/bbp.cscs.ch/project/proj64/circuits/O1.v6a/20171212/default_user.target
+	TargetFile /gpfs/bbp.cscs.ch/project/proj2/simulations/Gap_Junctions/new_syn2_test/user.target
+	BioName /gpfs/bbp.cscs.ch/project/proj64/circuits/O1.v6a/20171212/source/
+	CentralHyperColumn 2
+    BaseSeed 83238
+    CurrentDir .
+    OutputRoot test_with_active/
+	
+    #RunMode WholeCell
+    CircuitTarget mc2_Column
+    
+    Duration 10
+    Dt 0.025
+
+}
+
+Projection Thalamocortical_input_VPM
+{
+	Path /gpfs/bbp.cscs.ch/project/proj64/circuits/O1.v6a/20171212/proj_Thalamocortical_VPM/20171214-2
+	Source proj_Thalamocortical_VPM_Source
+}
+
+Stimulus spikeReplay
+{
+        Mode Current
+        Delay 0
+        Duration 100000000
+        Pattern SynapseReplay
+        SpikeFile /gpfs/bbp.cscs.ch/project/proj2/simulations/ThlInput/inputs.dat 
+
+}
+
+
+StimulusInject spikeReplayIntoUniverse
+{
+        Stimulus spikeReplay
+        Target Mosaic
+}
+
+
+Projection gapjunction
+{
+    # can use absolute path
+    # Path gap_junctions
+    Path /gpfs/bbp.cscs.ch/project/proj2/matwolf/gj_test_0umm_v2_oren_prunning/
+    #Path /gpfs/bbp.cscs.ch/project/proj2/matwolf/gj_test_0µm_v2/
+    Type GapJunction
+    Source Non
+}
+
+Reports
+
+Stimulus hypamp
+{
+        Mode Current
+  Pattern Hyperpolarizing
+        Delay 0.0
+  Duration 10000000.0
+}
+
+StimulusInject hypamp_mosaic
+{
+        Stimulus hypamp
+        Target Mosaic
+}
+
+OptStim

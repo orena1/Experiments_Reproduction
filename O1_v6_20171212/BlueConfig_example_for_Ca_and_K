@@ -1,0 +1,424 @@
+Run Default
+{
+
+   MorphologyPath /gpfs/bbp.cscs.ch/project/proj59/entities/morphologies/2017.10.31
+   METypePath   /gpfs/bbp.cscs.ch/project/proj64/home/vangeit/modelmanagement/prod.20171103/mm_runs/run/1810912/output/emodels_hoc/
+   MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj64/home/vangeit/modelmanagement/prod.20171103/megate_runs/run/6c6d611/output_select/mecombo_emodel.tsv
+
+      CircuitPath /gpfs/bbp.cscs.ch/project/proj64/circuits/O1.v6a/20171212/
+          nrnPath /gpfs/bbp.cscs.ch/project/proj64/circuits/O1.v6a/20171212/ncsFunctionalAllRecipePathways
+  CellLibraryFile circuit.mvd3
+
+        BaseSeed 540974
+
+	CurrentDir /gpfs/bbp.cscs.ch/project/proj64/simulations/O1.v6a.20171212/2018_LFP_sims/blob_stim/stimulus0/seed540974
+      OutputRoot /gpfs/bbp.cscs.ch/project/proj64/simulations/O1.v6a.20171212/2018_LFP_sims/blob_stim/stimulus0/seed540974
+      TargetFile /gpfs/bbp.cscs.ch/project/proj64/simulations/O1.v6a.20171212/2018_LFP_sims/blob_stim/stimulus0/seed540974/user.target
+
+
+      	RunMode WholeCell
+    CircuitTarget mc2_Column
+         Duration 2000
+               Dt 0.025
+	 ForwardSkip 5000
+
+}
+
+Projection Thalamocortical_input_VPM
+{
+  Path /gpfs/bbp.cscs.ch/project/proj64/circuits/O1.v6a/20171212/proj_Thalamocortical_VPM/20171214-2
+  Source proj_Thalamocortical_VPM_Source
+}
+
+Report soma
+{
+        Target mc2_Column
+        Type compartment
+        ReportOn v
+        Unit mV
+        Format Bin
+        Dt 0.1
+        StartTime 1000
+        EndTime 2000
+}
+
+Report AllCompartmentsMembrane
+{
+        Target AllCompartments
+        Type Summation
+        ReportOn i_membrane IClamp
+        Unit nA
+        Format Bin
+        Dt 0.1
+        StartTime 1000
+        EndTime 2000
+}
+
+Report voltage
+{
+        Target AllCompartments
+        Type compartment
+        ReportOn v
+        Unit mV
+        Format Bin
+        Dt 0.1
+        StartTime 1000
+        EndTime 2000
+}
+
+Stimulus spikeReplay
+{
+        Mode Current
+        Delay 0
+        Duration 10000
+        Pattern SynapseReplay
+        SpikeFile /gpfs/bbp.cscs.ch/project/proj64/simulations/O1.v6a.20171212/2018_LFP_sims/blob_stim/spikes/circuit0/input.dat
+
+}
+
+StimulusInject spikeReplayIntoUniverse
+{
+        Stimulus spikeReplay
+        Target Mosaic
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Stimulus ThresholdExc
+{
+
+              Mode Current
+           Pattern Noise
+       MeanPercent 85.0
+          Variance 0.001
+             Delay 0.000000
+          Duration 256440
+}
+
+Stimulus ThresholdInh
+{
+
+              Mode Current
+           Pattern Noise
+       MeanPercent 85.0
+          Variance 0.001
+             Delay 0.000000
+          Duration 256440
+}
+
+StimulusInject ThresholdIntoExc
+{
+        Stimulus ThresholdExc
+        Target Excitatory
+}
+
+StimulusInject ThresholdIntoInh
+{
+        Stimulus ThresholdInh
+        Target Inhibitory
+}
+
+Stimulus hypamp
+{
+        Mode Current
+  Pattern Hyperpolarizing
+        Delay 0.0
+  Duration 256440
+}
+
+StimulusInject hypamp_mosaic
+{
+        Stimulus hypamp
+        Target Mosaic
+}
+
+
+# Spont minis
+# NB: Weights here are effectively ignored.  Weight is taken as that assigned to the synapse
+# after processing all subsequent (non-delayed) connection blocks.
+
+Connection ConL6Exc-Uni
+{
+        Source Excitatory
+        Destination Layer6
+        Weight 1.0
+        SpontMinis 0.04
+}
+
+Connection ConL5Exc-Uni
+{
+        Source Excitatory
+        Destination Layer5
+        Weight 1.0
+        SpontMinis 0.067
+}
+
+Connection ConL4Exc-Uni
+{
+        Source Excitatory
+        Destination Layer4
+        Weight 1.0
+        SpontMinis 0.072
+}
+
+Connection ConL3Exc-Uni
+{
+        Source Excitatory
+        Destination Layer3
+        Weight 1.0
+        SpontMinis 0.122
+}
+
+Connection ConL2Exc-Uni
+{
+        Source Excitatory
+        Destination Layer2
+        Weight 1.0
+        SpontMinis 0.26
+}
+
+Connection ConL1Exc-Uni
+{
+        Source Excitatory
+        Destination Layer1
+        Weight 1.0
+        SpontMinis 0.63
+}
+
+
+
+Connection ConInh-Uni
+{
+        Source Inhibitory
+        Destination Mosaic
+        Weight 1.0
+	SpontMinis 0.012
+}
+
+
+# Adjust global synapse parameters, e.g. reversals
+
+Connection GABAB_erev
+{
+	Source Inhibitory
+	Destination Mosaic
+	Weight 1.0
+	SynapseConfigure %s.e_GABAA = -80.0 %s.e_GABAB = -75.8354310081
+}
+
+#Connection MGGate
+{
+	Source Excitatory
+	Destination Mosaic
+	Weight 1.0
+	SynapseConfigure %s.mg = 1.0
+}
+
+# Use adjustments due to Calcium 1.2 mM compared to normal 2.0 mM
+
+Connection scheme_CaUse_ee
+{       
+              Source Excitatory 
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 0.158401372855
+}
+
+Connection scheme_CaUse_e_2_PV_FS
+{       
+              Source Excitatory 
+         Destination PV_FS
+              Weight 1.0
+    SynapseConfigure %s.Use *= 0.647467256852
+}
+
+Connection scheme_CaUse_PV_FS_2_e
+{       
+              Source PV_FS
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 0.647467256852
+}
+
+Connection scheme_CaUse_e_2_DISTAR_INH
+{       
+              Source Excitatory 
+         Destination DISTAR_INH
+              Weight 1.0
+    SynapseConfigure %s.Use *= 0.158401372855
+}
+
+Connection scheme_CaUse_DISTAR_INH_2_e
+{       
+              Source DISTAR_INH
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 0.158401372855
+}
+
+Connection scheme_CaUse_e_2_Other_Inh
+{       
+              Source Excitatory 
+         Destination Other_Inh
+              Weight 1.0
+    SynapseConfigure %s.Use *= 0.402934314853
+}
+
+Connection scheme_CaUse_Other_Inh_2_e
+{       
+              Source Other_Inh
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 0.402934314853
+}
+
+Connection scheme_CaUse_Inh_Inh
+{       
+              Source Inhibitory
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.Use *= 0.402934314853
+}
+
+
+# Adjust AMPA_NMDA and GABAA_B ratios
+Connection scheme_nmda_e2e
+{       
+              Source Excitatory 
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.4
+}
+
+Connection scheme_nmda_e2i
+{       
+              Source Excitatory
+         Destination Inhibitory
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.8
+}
+
+Connection scheme_nmda_l5tpc
+{       
+              Source L5_TPC_AB
+         Destination L5_TPC_AB
+              Weight 1.0
+    SynapseConfigure %s.NMDA_ratio = 0.71
+}
+
+Connection NMDA_Override_L4-L4
+{
+        Source Layer4Excitatory
+        Destination Layer4Excitatory
+        Weight 1.0
+        SynapseConfigure %s.NMDA_ratio = 0.86
+
+}
+
+Connection NMDA_Override_L4-L23
+{
+        Source L4_SSC
+        Destination Layer23Excitatory
+        Weight 1.0
+        SynapseConfigure %s.NMDA_ratio = 0.5
+
+}
+
+Connection scheme1b
+{       
+              Source Layer1
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.GABAB_ratio = 0.75
+}
+
+Connection scheme2b
+{       
+              Source L23_NGC
+         Destination Excitatory
+              Weight 1.0
+    SynapseConfigure %s.GABAB_ratio = 0.75
+}
+
+Connection scheme_CaUse_ee_tc2c
+{
+              Source proj_Thalamocortical_VPM_Source
+         Destination Mosaic
+              Weight 1.0
+    SynapseConfigure %s.Use *= 0.158401372855
+}
+
+#Report I_Ca
+{
+        Target AllCompartments_mc2
+          Type Summation
+      ReportOn ica
+          Unit nA
+        Format Bin
+            Dt 0.1
+     StartTime 1000
+       EndTime 2000
+}
+
+#Report I_NonSpecific
+{
+        Target AllCompartments_mc2
+          Type Summation
+      ReportOn i_pas ihcn_Ih ihcn_hcn3 icsa_csa
+          Unit nA
+        Format Bin
+            Dt 0.1
+     StartTime 1000
+       EndTime 2000
+}
+
+#Report I_NMDA
+{
+       Target AllCompartments_mc2
+         Type Summation
+     ReportOn ProbAMPANMDA_EMS.i_NMDA
+         Unit nA
+       Format Bin
+           Dt 0.1
+    StartTime 1000
+      EndTime 2000
+}
+
+#Report I_AMPA
+{
+       Target AllCompartments_mc2
+         Type Summation
+     ReportOn ProbAMPANMDA_EMS.i_AMPA
+         Unit nA
+       Format Bin
+           Dt 0.1
+    StartTime 1000
+      EndTime 2000
+}
+
+#Report I_GABA
+{
+       Target AllCompartments_mc2
+         Type Summation
+     ReportOn ProbGABAA_EMS.i
+         Unit nA
+       Format Bin
+           Dt 0.1
+    StartTime 1000
+      EndTime 2000
+}
+
+

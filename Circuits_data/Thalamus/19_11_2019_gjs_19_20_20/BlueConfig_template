@@ -1,0 +1,54 @@
+Run Default
+{
+
+   MorphologyPath /gpfs/bbp.cscs.ch/project/proj82/home/iavarone/morphology_release/20191031/
+   METypePath   /gpfs/bbp.cscs.ch/project/proj82/home/iavarone/modelmanagement/20191105/memodels/hoc
+   MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj82/home/iavarone/modelmanagement/20191105/memodels/mecombo_emodel.tsv
+    #MEComboInfoFile /gpfs/bbp.cscs.ch/project/proj82/home/iavarone/modelmanagement/20191105/output_megate_dep/mecombo_emodel.tsv
+
+   
+      CircuitPath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2019-11-19
+          nrnPath /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2019-11-19/connectome/functional/edges.sonata
+  CellLibraryFile circuit.mvd3
+
+        BaseSeed 955325
+
+
+	CurrentDir /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2019-11-21/gap-junctions_test_2
+      OutputRoot /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2019-11-21/gap-junctions_test_2
+      #TargetFile /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/simulations/2019-11-21_GJs/hold_scans_fromrest_NOGJs_noknl/HoldLevel0p0/HoldTargetRt_RC/seed852672/user.target
+
+
+      	RunMode LoadBalance
+    CircuitTarget Rt_RC
+         Duration 1500
+               Dt 0.025
+	 ForwardSkip 5000
+}
+
+Projection gapjunction
+{
+    Path /gpfs/bbp.cscs.ch/project/proj55/iavarone/releases/circuits/O1/2019-11-19/sonata/networks/edges/gap-junctions
+    Type GapJunction
+}
+
+
+
+Reports
+
+#Stimulus HoldRt
+{
+              Mode Current
+           Pattern Noise
+       MeanPercent 75.0
+          Variance 0.00000000001
+             Delay 0
+          Duration 10000000.0
+}
+#StimulusInject HoldInjRt
+{
+        Stimulus HoldRt
+        Target Rt_RC
+}
+
+OptStim

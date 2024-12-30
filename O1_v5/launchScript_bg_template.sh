@@ -5,8 +5,6 @@
 #SBATCH --ntasks-per-node=32
 #SBATCH --overcommit
 #SBATCH --time=65:00:00
-##SBATCH --mail-user=oren.amsalem@epfl.ch
-#SBATCH --mail-type=ALL
 #SBATCH --output=neurodamus-stdout_bg_200.log
 #SBATCH --error=neurodamus-stderr_bg_200.log
 #SBATCH --account=proj2
@@ -48,8 +46,6 @@ I/O node racks and I/O nodes (8 I/O nodes per midplane):
 
 # workaround
 sleep 5
-module load slurm
-module load numpy
 #
 echo "Print current shell limits :"
 echo
@@ -63,6 +59,6 @@ echo
 export HOC_LIBRARY_PATH=/gpfs/bbp.cscs.ch/project/proj2/Programs/SaveStateNeuron/bgq/neurodamus/lib/hoclib
 
 # default runs with max mpi process = ntasks
-srun binPath -c "{strdef configFile configFile=\"BlueConfig\"}" -NFRAME 256 $HOC_LIBRARY_PATH/init.hoc
+srun dplace binPath -c "{strdef configFile configFile=\"BlueConfig\"}" -NFRAME 256 $HOC_LIBRARY_PATH/init.hoc
 
 echo "EndTime" `date +"%d-%m-%y-%T"`

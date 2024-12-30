@@ -170,9 +170,6 @@ path_for_simulations = '/gpfs/bbp.cscs.ch/project/proj2/simulations/Reproducing_
 
 
 
-    
-
-
 reports = {'soma_voltage':{
         'REPORT_TARGET':'mc2_Column',
         'START_TIME':str(1900),

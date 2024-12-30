@@ -1,0 +1,25 @@
+{nrnpython( "import shutil, os.path" )}
+
+
+
+// Use helper functions from python os.path
+objref _py, ospath, shutil
+_py = new PythonObject()
+ospath = _py.os.path
+shutil = _py.shutil
+
+
+
+///Utility function to nicely show error and quit
+proc die() { localobj outstr, pc
+    pc = new ParallelContext()
+    if( pc.id() == 0 ) {
+        outstr = new String()
+        sprint(outstr.s, "[ ABORT ] %s", $s1)
+        if( numarg() >= 2 ) {
+            sprint(outstr.s, "%s: %s", outstr.s, $s2)
+        }
+        print outstr.s
+    }
+    quit()
+}
